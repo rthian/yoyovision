@@ -39,3 +39,16 @@ async def test_get_unknown_ruleset_version_returns_404(
 async def test_rulesets_endpoint_requires_authentication(client: AsyncClient) -> None:
     response = await client.get("/rulesets")
     assert response.status_code == 401
+
+
+async def test_list_rulesets_includes_iyyf_wyyc_25_draft(
+    client: AsyncClient, auth_headers: dict[str, str]
+) -> None:
+    response = await client.get("/rulesets", headers=auth_headers)
+    assert response.status_code == 200
+    versions = [r["version"] for r in response.json()]
+    assert "iyyf-wyyc-25-draft" in versions
+    draft = next(r for r in response.json() if r["version"] == "iyyf-wyyc-25-draft")
+    assert draft["is_official"] is False
+    assert draft["technical_weight"] == 0.6
+    assert draft["freestyle_evaluation_weight"] == 0.4

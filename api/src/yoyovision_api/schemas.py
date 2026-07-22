@@ -69,11 +69,16 @@ class AnalysisJobRead(BaseModel):
     routine_end_ms: int | None = None
     review_state: AnalysisReviewState = AnalysisReviewState.DRAFT
     submitted_at: datetime | None = None
+    ruleset_version: str = "1a-draft-0.1"
 
 
 class RoutineWindowUpdate(BaseModel):
     routine_start_ms: int | None = Field(default=None, ge=0)
     routine_end_ms: int | None = Field(default=None, ge=0)
+
+
+class RulesetVersionUpdate(BaseModel):
+    ruleset_version: str = Field(min_length=1, max_length=32)
 
 
 class AnalysisEventRead(BaseModel):

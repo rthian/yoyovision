@@ -24,6 +24,11 @@ function makeJob(overrides: Partial<AnalysisJob> = {}): AnalysisJob {
     is_shadow: false,
     cancel_requested: false,
     retry_count: 0,
+    routine_start_ms: null,
+    routine_end_ms: null,
+    review_state: "draft",
+    submitted_at: null,
+    ruleset_version: "1a-draft-0.1",
     ...overrides,
   };
 }
@@ -70,5 +75,19 @@ describe("AnalysisJobList", () => {
 
     expect(screen.getByRole("link", { name: "Review" })).toHaveAttribute("href", "/analyses/job-1");
     expect(screen.queryByRole("button", { name: "Cancel" })).not.toBeInTheDocument();
+  });
+
+  it("shows Delete for completed jobs when onDelete is provided", () => {
+    const onDelete = vi.fn();
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    render(
+      <AnalysisJobList
+        jobs={[makeJob({ status: "completed", current_stage: "done" })]}
+        onDelete={onDelete}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Delete" }));
+    expect(onDelete).toHaveBeenCalledWith("job-1");
   });
 });

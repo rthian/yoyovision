@@ -62,6 +62,12 @@ analysis_jobs = Table(
     Column("is_shadow", Boolean, nullable=False, default=False),
     Column("cancel_requested", Boolean, nullable=False, default=False),
     Column("retry_count", Integer, nullable=False, default=0),
+    Column("routine_start_ms", Integer, nullable=True),
+    Column("routine_end_ms", Integer, nullable=True),
+    Column("review_state", String(16), nullable=False, default="draft"),
+    Column("submitted_at", DateTime(timezone=True), nullable=True),
+    Column("submitted_by", String(36), nullable=True),
+    Column("ruleset_version", String(32), nullable=False, default="1a-draft-0.1"),
 )
 
 analysis_events = Table(

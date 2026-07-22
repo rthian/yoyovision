@@ -5,14 +5,17 @@ from __future__ import annotations
 from datetime import UTC, datetime
 
 from fastapi import APIRouter, HTTPException, status
+from fastapi.responses import Response
 from sqlalchemy import select
 from yoyovision_ml.domain import AnalysisReviewState, JobStatus
+from yoyovision_ml.ruleset import get_ruleset_by_version
 
 from yoyovision_api.db_models import AnalysisJobORM, ScoreBreakdownORM, VideoAssetORM
 from yoyovision_api.deps import CurrentUser, DbSession, OwnedJob, SettingsDep
 from yoyovision_api.schemas import (
     AnalysisJobRead,
     RoutineWindowUpdate,
+    RulesetVersionUpdate,
     ScoreBreakdownRead,
     ScoreLineItemsRead,
     ScorePreviewRead,
@@ -22,6 +25,7 @@ from yoyovision_api.services.review_guard import ensure_analysis_editable, ensur
 from yoyovision_api.services.scoring_service import (
     compute_score_line_items,
     compute_score_preview,
+    job_ruleset_version,
     recompute_score,
     resolve_routine_window,
 )
@@ -54,7 +58,7 @@ async def cancel_analysis(job: OwnedJob, session: DbSession) -> AnalysisJobORM:
 async def get_score(job: OwnedJob, session: DbSession, settings: SettingsDep) -> ScoreBreakdownORM:
     """Returns the current score, recomputing it from current DB state first
     so the returned breakdown always reflects the latest human edits."""
-    breakdown = await recompute_score(session, job, settings.ruleset_version)
+    breakdown = await recompute_score(session, job, job_ruleset_version(job, settings.ruleset_version))
     await session.commit()
     return breakdown
 
@@ -64,7 +68,7 @@ async def get_score_line_items(
     job: OwnedJob, session: DbSession, settings: SettingsDep
 ) -> ScoreLineItemsRead:
     """Returns per-event technical credit rows for the review UI."""
-    technical_raw, items = await compute_score_line_items(session, job, settings.ruleset_version)
+    technical_raw, items = await compute_score_line_items(session, job, job_ruleset_version(job, settings.ruleset_version))
     return ScoreLineItemsRead(
         technical_raw=technical_raw,
         technical_line_items=[TechnicalLineItemRead.model_validate(item) for item in items],
@@ -84,7 +88,7 @@ async def get_score_preview(
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="up_to_ms must be >= 0")
 
     breakdown, event_rows, completed_count = await compute_score_preview(
-        session, job, settings.ruleset_version, up_to_ms
+        session, job, job_ruleset_version(job, settings.ruleset_version), up_to_ms
     )
     active_event_id = next(
         (
@@ -117,7 +121,7 @@ async def recompute_analysis_score(
     """Explicit recompute endpoint (same effect as `GET .../score`, exposed
     separately so review-UI "Recalculate score" actions are self-documenting
     and show up distinctly in server logs/audit trails)."""
-    breakdown = await recompute_score(session, job, settings.ruleset_version)
+    breakdown = await recompute_score(session, job, job_ruleset_version(job, settings.ruleset_version))
     await session.commit()
     return breakdown
 
@@ -156,7 +160,7 @@ async def update_routine_window(
             detail="routine_end_ms must be greater than routine_start_ms.",
         )
 
-    await recompute_score(session, job, settings.ruleset_version)
+    await recompute_score(session, job, job_ruleset_version(job, settings.ruleset_version))
     await session.commit()
     await session.refresh(job)
     return job
@@ -192,3 +196,42 @@ async def reopen_analysis(job: OwnedJob, session: DbSession) -> AnalysisJobORM:
     await session.commit()
     await session.refresh(job)
     return job
+
+
+
+
+@router.patch("/{analysis_id}/ruleset", response_model=AnalysisJobRead)
+async def update_analysis_ruleset(
+    job: OwnedJob,
+    payload: RulesetVersionUpdate,
+    session: DbSession,
+    settings: SettingsDep,
+) -> AnalysisJobORM:
+    """Switches the versioned scoring config for this analysis and recomputes."""
+    ensure_analysis_editable(job)
+    if get_ruleset_by_version(payload.ruleset_version) is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Unknown ruleset version: {payload.ruleset_version}",
+        )
+    job.ruleset_version = payload.ruleset_version
+    await recompute_score(session, job, job_ruleset_version(job, settings.ruleset_version))
+    await session.commit()
+    await session.refresh(job)
+    return job
+
+
+@router.delete("/{analysis_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_analysis(job: OwnedJob, session: DbSession) -> Response:
+    """Permanently removes a finished analysis run and all derived artefacts."""
+    if job.status not in _TERMINAL_STATUSES:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "Cannot delete an analysis that is still pending or running. "
+                "Cancel it first, then delete once it has stopped."
+            ),
+        )
+    await session.delete(job)
+    await session.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

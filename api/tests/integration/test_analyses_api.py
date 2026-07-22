@@ -46,6 +46,35 @@ async def test_cancel_analysis_sets_cancel_requested(
     assert refetched.json()["cancel_requested"] is True
 
 
+async def test_delete_analysis_removes_finished_job(
+    client: AsyncClient, auth_headers: dict[str, str], db_session: object
+) -> None:
+    from yoyovision_ml.domain import JobStatus
+
+    from yoyovision_api.db_models import AnalysisJobORM
+
+    job_id = await _upload_and_get_job_id(client, auth_headers)
+    job = await db_session.get(AnalysisJobORM, job_id)  # type: ignore[attr-defined]
+    assert job is not None
+    job.status = JobStatus.COMPLETED
+    await db_session.commit()  # type: ignore[attr-defined]
+
+    response = await client.delete(f"/analyses/{job_id}", headers=auth_headers)
+    assert response.status_code == 204
+
+    missing = await client.get(f"/analyses/{job_id}", headers=auth_headers)
+    assert missing.status_code == 404
+
+
+async def test_delete_running_analysis_returns_409(
+    client: AsyncClient, auth_headers: dict[str, str]
+) -> None:
+    job_id = await _upload_and_get_job_id(client, auth_headers)
+
+    response = await client.delete(f"/analyses/{job_id}", headers=auth_headers)
+    assert response.status_code == 409
+
+
 async def test_cancel_analysis_owned_by_another_user_returns_404(
     client: AsyncClient,
     auth_headers: dict[str, str],
@@ -82,3 +111,30 @@ async def test_trigger_analysis_with_shadow_true_flags_job_as_shadow(
         f"/videos/{video_id}/analyses", headers=auth_headers
     )
     assert default_response.json()["is_shadow"] is False
+
+
+async def test_patch_analysis_ruleset_updates_version_and_recomputes(
+    client: AsyncClient, auth_headers: dict[str, str], db_session: object
+) -> None:
+    from yoyovision_ml.domain import JobStatus
+
+    from yoyovision_api.db_models import AnalysisJobORM, ScoreBreakdownORM
+
+    job_id = await _upload_and_get_job_id(client, auth_headers)
+    job = await db_session.get(AnalysisJobORM, job_id)  # type: ignore[attr-defined]
+    assert job is not None
+    job.status = JobStatus.COMPLETED
+    await db_session.commit()  # type: ignore[attr-defined]
+
+    response = await client.patch(
+        f"/analyses/{job_id}/ruleset",
+        headers=auth_headers,
+        json={"ruleset_version": "iyyf-wyyc-25-draft"},
+    )
+    assert response.status_code == 200
+    assert response.json()["ruleset_version"] == "iyyf-wyyc-25-draft"
+
+    score = await client.get(f"/analyses/{job_id}/score", headers=auth_headers)
+    assert score.status_code == 200
+    assert score.json()["ruleset_version"] == "iyyf-wyyc-25-draft"
+

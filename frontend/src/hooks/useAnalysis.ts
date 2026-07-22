@@ -9,6 +9,7 @@ import {
   reopenAnalysis,
   recomputeScore,
   submitAnalysis,
+  updateAnalysisRuleset,
   updateRoutineWindow,
 } from "@/lib/api-client";
 
@@ -99,4 +100,17 @@ export function useInvalidateScore(analysisId: string) {
     void queryClient.invalidateQueries({ queryKey: scoreQueryKey(analysisId) });
     void queryClient.invalidateQueries({ queryKey: scoreLineItemsQueryKey(analysisId) });
   };
+}
+
+
+export function useUpdateAnalysisRuleset(analysisId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (rulesetVersion: string) => updateAnalysisRuleset(analysisId, rulesetVersion),
+    onSuccess: (job) => {
+      queryClient.setQueryData(analysisQueryKey(analysisId), job);
+      void queryClient.invalidateQueries({ queryKey: scoreQueryKey(analysisId) });
+      void queryClient.invalidateQueries({ queryKey: scoreLineItemsQueryKey(analysisId) });
+    },
+  });
 }

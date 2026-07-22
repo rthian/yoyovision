@@ -143,6 +143,11 @@ class AnalysisJobORM(Base):
     submitted_by: Mapped[str | None] = mapped_column(
         String(36), ForeignKey("users.id"), nullable=True
     )
+    #: Versioned scoring config applied to this analysis. Defaults from API
+    #: settings at job creation; judges may switch rulesets during review.
+    ruleset_version: Mapped[str] = mapped_column(
+        String(32), nullable=False, default="1a-draft-0.1"
+    )
 
     video: Mapped[VideoAssetORM] = relationship(back_populates="jobs")
     events: Mapped[list[AnalysisEventORM]] = relationship(

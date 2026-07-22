@@ -9,6 +9,7 @@ import { AuthGate } from "@/components/AuthGate";
 import { useAuth } from "@/hooks/useAuth";
 import {
   useCancelAnalysis,
+  useDeleteAnalysis,
   useTriggerVideoAnalysis,
   useVideo,
   useVideoAnalyses,
@@ -23,6 +24,7 @@ function VideoDetail({ videoId }: { videoId: string }): JSX.Element {
   const analysesQuery = useVideoAnalyses(videoId, isAuthenticated);
   const triggerAnalysis = useTriggerVideoAnalysis(videoId);
   const cancelAnalysisMutation = useCancelAnalysis(videoId);
+  const deleteAnalysisMutation = useDeleteAnalysis(videoId);
 
   if (videoQuery.isLoading) {
     return <p className="text-sm text-content-dim">Loading...</p>;
@@ -85,8 +87,12 @@ function VideoDetail({ videoId }: { videoId: string }): JSX.Element {
         <AnalysisJobList
           jobs={analysesQuery.data ?? []}
           onCancel={(analysisId) => cancelAnalysisMutation.mutate(analysisId)}
+          onDelete={(analysisId) => deleteAnalysisMutation.mutate(analysisId)}
           cancellingId={
             cancelAnalysisMutation.isPending ? cancelAnalysisMutation.variables : undefined
+          }
+          deletingId={
+            deleteAnalysisMutation.isPending ? deleteAnalysisMutation.variables : undefined
           }
         />
       )}

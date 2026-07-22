@@ -13,11 +13,12 @@ import { FreestyleEvaluationForm } from "@/components/FreestyleEvaluationForm";
 import { LiveScoreStrip } from "@/components/LiveScoreStrip";
 import { ReviewLockBanner } from "@/components/ReviewLockBanner";
 import { RoutineWindowPanel } from "@/components/RoutineWindowPanel";
+import { RulesetPicker } from "@/components/RulesetPicker";
 import { RulesetPanel } from "@/components/RulesetPanel";
 import { ScoreBreakdownPanel } from "@/components/ScoreBreakdownPanel";
 import { VideoPlayerWithOverlay } from "@/components/VideoPlayerWithOverlay";
 
-import { useAnalysisJob, useReopenAnalysis, useScore, useScoreLineItems, useSubmitAnalysis, useUpdateRoutineWindow } from "@/hooks/useAnalysis";
+import { useAnalysisJob, useReopenAnalysis, useScore, useScoreLineItems, useSubmitAnalysis, useUpdateAnalysisRuleset, useUpdateRoutineWindow } from "@/hooks/useAnalysis";
 import type { TechnicalLineItem } from "@/lib/types";
 import { computeLiveScorePreview } from "@/lib/live-score-preview";
 import { formatMsAsTimecode } from "@/lib/format";
@@ -26,7 +27,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useDeductions } from "@/hooks/useDeductions";
 import { useEvaluation } from "@/hooks/useEvaluation";
 import { useEvents } from "@/hooks/useEvents";
-import { useRuleset } from "@/hooks/useRulesets";
+import { useRuleset, useRulesets } from "@/hooks/useRulesets";
 import { useVideo } from "@/hooks/useVideos";
 import { useVideoBlobUrl } from "@/hooks/useVideoBlobUrl";
 
@@ -52,7 +53,10 @@ function AnalysisReview({ analysisId }: { analysisId: string }): JSX.Element {
   const submitAnalysis = useSubmitAnalysis(analysisId);
   const reopenAnalysis = useReopenAnalysis(analysisId);
   const evaluationQuery = useEvaluation(analysisId, isAuthenticated);
-  const rulesetQuery = useRuleset(scoreQuery.data?.ruleset_version, isAuthenticated);
+  const rulesetVersion = job?.ruleset_version ?? scoreQuery.data?.ruleset_version;
+  const rulesetQuery = useRuleset(rulesetVersion, isAuthenticated);
+  const rulesetsQuery = useRulesets(isAuthenticated);
+  const updateRuleset = useUpdateAnalysisRuleset(analysisId);
 
   const events = eventsQuery.data ?? [];
   const lineItemsByEventId = useMemo(() => {
@@ -246,6 +250,16 @@ function AnalysisReview({ analysisId }: { analysisId: string }): JSX.Element {
           analysisId={analysisId}
           score={score}
           ruleset={ruleset}
+        />
+        <RulesetPicker
+          rulesets={rulesetsQuery.data ?? []}
+          selectedVersion={rulesetVersion ?? "1a-draft-0.1"}
+          disabled={isLocked || updateRuleset.isPending}
+          onChange={(version) => {
+            if (version !== rulesetVersion) {
+              updateRuleset.mutate(version);
+            }
+          }}
         />
         <RulesetPanel ruleset={rulesetQuery.data ?? null} />
       </section>

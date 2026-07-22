@@ -11,7 +11,7 @@ from yoyovision_api.db_models import MajorDeductionORM
 from yoyovision_api.deps import DbSession, OwnedJob, SettingsDep
 from yoyovision_api.schemas import MajorDeductionCreate, MajorDeductionRead, MajorDeductionUpdate
 from yoyovision_api.services.review_guard import ensure_analysis_editable
-from yoyovision_api.services.scoring_service import recompute_score
+from yoyovision_api.services.scoring_service import job_ruleset_version, recompute_score
 
 router = APIRouter(prefix="/analyses/{analysis_id}/deductions", tags=["deductions"])
 
@@ -60,7 +60,7 @@ async def create_deduction(
     )
     session.add(deduction)
     await session.flush()
-    await recompute_score(session, job, settings.ruleset_version)
+    await recompute_score(session, job, job_ruleset_version(job, settings.ruleset_version))
     await session.commit()
     return deduction
 
@@ -86,7 +86,7 @@ async def update_deduction(
     )
 
     await session.flush()
-    await recompute_score(session, job, settings.ruleset_version)
+    await recompute_score(session, job, job_ruleset_version(job, settings.ruleset_version))
     await session.commit()
     return deduction
 
@@ -110,7 +110,7 @@ async def reject_deduction(
     deduction = await _get_owned_deduction(job, deduction_id, session)
     deduction.review_status = ReviewStatus.REJECTED
     await session.flush()
-    await recompute_score(session, job, settings.ruleset_version)
+    await recompute_score(session, job, job_ruleset_version(job, settings.ruleset_version))
     await session.commit()
     return deduction
 
@@ -123,6 +123,6 @@ async def delete_deduction(
     deduction = await _get_owned_deduction(job, deduction_id, session)
     await session.delete(deduction)
     await session.flush()
-    await recompute_score(session, job, settings.ruleset_version)
+    await recompute_score(session, job, job_ruleset_version(job, settings.ruleset_version))
     await session.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)

@@ -50,6 +50,7 @@ describe("RulesetPanel", () => {
     expect(screen.getByText(/Ruleset 2026.1.0-mock/)).toBeInTheDocument();
     expect(screen.getByText(/unofficial draft/)).toBeInTheDocument();
     expect(screen.getByText(RULESET.disclaimer)).toBeInTheDocument();
+    expect(screen.getByText(/Score blend: 60% technical/)).toBeInTheDocument();
     expect(screen.getByText(/yoyo_detach: 2 pts each \(capped at 3 occurrences\)/)).toBeInTheDocument();
     expect(
       screen.getByText(/dangerous_play_review: 5 pts each -- requires manual confirmation/)

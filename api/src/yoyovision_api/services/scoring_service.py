@@ -132,6 +132,11 @@ def resolve_ruleset(ruleset_version: str) -> Ruleset:
     return get_ruleset_by_version(ruleset_version) or default_ruleset()
 
 
+def job_ruleset_version(job: AnalysisJobORM, settings_default: str) -> str:
+    """Returns the ruleset version bound to this analysis job."""
+    return job.ruleset_version or settings_default
+
+
 async def recompute_score(
     session: AsyncSession, job: AnalysisJobORM, ruleset_version: str
 ) -> ScoreBreakdownORM:

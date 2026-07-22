@@ -237,6 +237,20 @@ export function cancelAnalysis(analysisId: string): Promise<AnalysisJob> {
   return request<AnalysisJob>(`/analyses/${analysisId}/cancel`, { method: "POST" });
 }
 
+export function deleteAnalysis(analysisId: string): Promise<void> {
+  return request<void>(`/analyses/${analysisId}`, { method: "DELETE" });
+}
+
+export function updateAnalysisRuleset(
+  analysisId: string,
+  rulesetVersion: string
+): Promise<AnalysisJob> {
+  return request<AnalysisJob>(`/analyses/${analysisId}/ruleset`, {
+    method: "PATCH",
+    jsonBody: { ruleset_version: rulesetVersion },
+  });
+}
+
 export function updateRoutineWindow(
   analysisId: string,
   payload: { routine_start_ms?: number | null; routine_end_ms?: number | null }

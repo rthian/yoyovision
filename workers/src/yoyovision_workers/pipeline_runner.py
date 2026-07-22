@@ -256,7 +256,8 @@ async def _run_pipeline_for_job(
             await _mark_failed(conn, job_id, "pipeline_error", str(exc)[:2048])
         return
 
-    ruleset = get_ruleset_by_version(settings.ruleset_version) or default_ruleset()
+    job_ruleset = job_row.get("ruleset_version") or settings.ruleset_version
+    ruleset = get_ruleset_by_version(job_ruleset) or default_ruleset()
 
     probed_duration_ms = video_row["duration_ms"] or 0
     probed_fps = video_row["fps"] or _DEFAULT_FPS_IF_UNKNOWN

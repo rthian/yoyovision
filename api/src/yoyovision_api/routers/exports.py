@@ -20,6 +20,7 @@ from yoyovision_api.db_models import (
 )
 from yoyovision_api.deps import CurrentUser, DbSession, OwnedJob, SettingsDep, StorageDep
 from yoyovision_api.services.dataset_export_service import build_dataset_record
+from yoyovision_api.services.scoring_service import job_ruleset_version
 from yoyovision_api.services.domain_mapping import (
     deduction_to_domain,
     event_to_domain,
@@ -58,7 +59,7 @@ async def export_json(job: OwnedJob, session: DbSession, settings: SettingsDep) 
         deductions=[deduction_to_domain(d) for d in deductions_result.scalars().all()],
         score=score_to_domain(score_row) if score_row is not None else None,
         pipeline_version=job.pipeline_version,
-        ruleset_version=settings.ruleset_version,
+        ruleset_version=job_ruleset_version(job, settings.ruleset_version),
     )
     filename = sanitize_export_filename(f"yoyovision-analysis-{job.id}", "json")
     return Response(

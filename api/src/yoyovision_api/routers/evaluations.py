@@ -10,7 +10,7 @@ from yoyovision_api.db_models import FreestyleEvaluationORM
 from yoyovision_api.deps import DbSession, OwnedJob, SettingsDep
 from yoyovision_api.schemas import FreestyleEvaluationRead, FreestyleEvaluationUpsert
 from yoyovision_api.services.review_guard import ensure_analysis_editable
-from yoyovision_api.services.scoring_service import recompute_score
+from yoyovision_api.services.scoring_service import job_ruleset_version, recompute_score
 
 router = APIRouter(prefix="/analyses/{analysis_id}/evaluation", tags=["evaluations"])
 
@@ -51,6 +51,6 @@ async def upsert_evaluation(
     evaluation.notes = payload.notes
 
     await session.flush()
-    await recompute_score(session, job, settings.ruleset_version)
+    await recompute_score(session, job, job_ruleset_version(job, settings.ruleset_version))
     await session.commit()
     return evaluation

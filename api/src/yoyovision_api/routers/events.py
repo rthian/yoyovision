@@ -19,7 +19,7 @@ from yoyovision_api.db_models import AnalysisEventORM
 from yoyovision_api.deps import DbSession, OwnedJob, SettingsDep
 from yoyovision_api.schemas import AnalysisEventCreate, AnalysisEventRead, AnalysisEventUpdate
 from yoyovision_api.services.review_guard import ensure_analysis_editable
-from yoyovision_api.services.scoring_service import recompute_score
+from yoyovision_api.services.scoring_service import job_ruleset_version, recompute_score
 
 router = APIRouter(prefix="/analyses/{analysis_id}/events", tags=["events"])
 
@@ -71,7 +71,7 @@ async def create_event(
     )
     session.add(event)
     await session.flush()
-    await recompute_score(session, job, settings.ruleset_version)
+    await recompute_score(session, job, job_ruleset_version(job, settings.ruleset_version))
     await session.commit()
     return event
 
@@ -98,7 +98,7 @@ async def update_event(
     )
 
     await session.flush()
-    await recompute_score(session, job, settings.ruleset_version)
+    await recompute_score(session, job, job_ruleset_version(job, settings.ruleset_version))
     await session.commit()
     return event
 
@@ -120,7 +120,7 @@ async def reject_event(
     event = await _get_owned_event(job, event_id, session)
     event.review_status = ReviewStatus.REJECTED
     await session.flush()
-    await recompute_score(session, job, settings.ruleset_version)
+    await recompute_score(session, job, job_ruleset_version(job, settings.ruleset_version))
     await session.commit()
     return event
 
@@ -133,6 +133,6 @@ async def delete_event(
     event = await _get_owned_event(job, event_id, session)
     await session.delete(event)
     await session.flush()
-    await recompute_score(session, job, settings.ruleset_version)
+    await recompute_score(session, job, job_ruleset_version(job, settings.ruleset_version))
     await session.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)

@@ -22,6 +22,16 @@ export function RulesetPanel({ ruleset }: RulesetPanelProps): JSX.Element | null
       </summary>
       <div className="mt-3 flex flex-col gap-3 text-sm">
         <p className="text-content-subtle">{ruleset.disclaimer}</p>
+        <div className="rounded-s bg-background-alt px-3 py-2 text-content-dim">
+          <div>
+            Score blend: {Math.round(ruleset.technical_weight * 100)}% technical /{" "}
+            {Math.round(ruleset.freestyle_evaluation_weight * 100)}% freestyle evaluation
+          </div>
+          <div>
+            Final = ({ruleset.technical_weight} × TE scaled) + (
+            {ruleset.freestyle_evaluation_weight} × FE scaled) − major deductions
+          </div>
+        </div>
         <div>
           <h4 className="font-semibold text-content-default">Difficulty band points</h4>
           <ul className="text-content-dim">
@@ -42,6 +52,16 @@ export function RulesetPanel({ ruleset }: RulesetPanelProps): JSX.Element | null
                   ? ` (capped at ${rule.max_occurrences_penalized} occurrences)`
                   : ""}
                 {rule.requires_manual_confirmation ? " -- requires manual confirmation" : ""}
+              </li>
+            ))}
+          </ul>
+        </div>
+        <div>
+          <h4 className="font-semibold text-content-default">Freestyle evaluation weights</h4>
+          <ul className="text-content-dim">
+            {Object.entries(ruleset.freestyle_evaluation_weights).map(([category, weight]) => (
+              <li key={category}>
+                {category.replaceAll("_", " ")}: {weight}
               </li>
             ))}
           </ul>

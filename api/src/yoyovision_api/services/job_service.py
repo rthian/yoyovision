@@ -29,6 +29,7 @@ async def create_and_dispatch_analysis_job(
         progress=0.0,
         current_stage=PipelineStage.QUEUED,
         pipeline_version=settings.pipeline_version,
+        ruleset_version=settings.ruleset_version,
         is_shadow=is_shadow,
     )
     session.add(job)

@@ -159,6 +159,7 @@ export interface AnalysisJob {
   routine_end_ms: number | null;
   review_state: AnalysisReviewState;
   submitted_at: string | null;
+  ruleset_version: string;
 }
 
 export interface AnalysisEvent {

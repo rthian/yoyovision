@@ -29,21 +29,32 @@ const STAGE_LABELS: Record<NonNullable<AnalysisJob["current_stage"]>, string> = 
 };
 
 const CANCELLABLE_STATUSES: ReadonlySet<AnalysisJob["status"]> = new Set(["pending", "running"]);
+const DELETABLE_STATUSES: ReadonlySet<AnalysisJob["status"]> = new Set([
+  "completed",
+  "failed",
+  "cancelled",
+]);
 
 interface AnalysisJobListProps {
   jobs: AnalysisJob[];
   /** Requests cancellation for a pending/running job (Prompt F). Optional
    * so this component still works read-only (e.g. no ownership context). */
   onCancel?: (analysisId: string) => void;
+  /** Permanently removes a finished analysis run. Optional for read-only use. */
+  onDelete?: (analysisId: string) => void;
   /** Analysis id whose cancel request is currently in flight, if any --
    * disables that row's button and shows a pending label. */
   cancellingId?: string;
+  /** Analysis id whose delete request is currently in flight, if any. */
+  deletingId?: string;
 }
 
 export function AnalysisJobList({
   jobs,
   onCancel,
+  onDelete,
   cancellingId,
+  deletingId,
 }: AnalysisJobListProps): JSX.Element {
   if (jobs.length === 0) {
     return <p className="text-sm text-content-dim">No analysis runs yet.</p>;
@@ -54,6 +65,8 @@ export function AnalysisJobList({
       {jobs.map((job) => {
         const isCancellable = CANCELLABLE_STATUSES.has(job.status) && !job.cancel_requested;
         const isCancelling = cancellingId === job.id;
+        const isDeletable = DELETABLE_STATUSES.has(job.status);
+        const isDeleting = deletingId === job.id;
 
         return (
           <li
@@ -93,6 +106,24 @@ export function AnalysisJobList({
                   className="rounded-full border border-outline-default px-4 py-2 text-sm font-semibold text-status-alert hover:bg-status-alert/10 disabled:opacity-60"
                 >
                   {isCancelling ? "Cancelling..." : "Cancel"}
+                </button>
+              ) : null}
+              {onDelete && isDeletable ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (
+                      window.confirm(
+                        "Delete this analysis run? Events, deductions, and scores will be permanently removed."
+                      )
+                    ) {
+                      onDelete(job.id);
+                    }
+                  }}
+                  disabled={isDeleting}
+                  className="rounded-full border border-outline-default px-4 py-2 text-sm font-semibold text-status-alert hover:bg-status-alert/10 disabled:opacity-60"
+                >
+                  {isDeleting ? "Deleting..." : "Delete"}
                 </button>
               ) : null}
               {job.status === "completed" ? (

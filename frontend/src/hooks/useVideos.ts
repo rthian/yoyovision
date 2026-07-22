@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import {
   cancelAnalysis,
+  deleteAnalysis,
   deleteVideo,
   getVideo,
   listVideoAnalyses,
@@ -85,6 +86,16 @@ export function useCancelAnalysis(videoId: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (analysisId: string) => cancelAnalysis(analysisId),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: videoAnalysesQueryKey(videoId) });
+    },
+  });
+}
+
+export function useDeleteAnalysis(videoId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (analysisId: string) => deleteAnalysis(analysisId),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: videoAnalysesQueryKey(videoId) });
     },
