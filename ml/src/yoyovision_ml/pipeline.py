@@ -75,7 +75,7 @@ from yoyovision_ml.domain import (
     ScoreBreakdown,
     Track,
 )
-from yoyovision_ml.feature_extraction import DeterministicFeatureExtractor
+from yoyovision_ml.perception.features import compute_kinematic_features
 from yoyovision_ml.inference.cancellation import CancellationToken
 from yoyovision_ml.inference.device import resolve_device
 from yoyovision_ml.inference.device import runtime_versions as _runtime_versions
@@ -280,14 +280,14 @@ def run_analysis_pipeline(
 
     _stage(PipelineStage.STRING_ANALYSIS)
     with timings.measure(PipelineStage.STRING_ANALYSIS.value):
-        string_features = DeterministicStringAnalyzer().analyze(tracks, hand_sequence)
+        _string_features = DeterministicStringAnalyzer().analyze(tracks, hand_sequence)
     _finish(PipelineStage.STRING_ANALYSIS)
 
     _stage(PipelineStage.FEATURE_EXTRACTION)
     multimodal_model_versions: dict[str, str] = {}
     with timings.measure(PipelineStage.FEATURE_EXTRACTION.value):
-        features = DeterministicFeatureExtractor().extract(
-            pose_sequence, hand_sequence, tracks, string_features
+        features = compute_kinematic_features(
+            pose_sequence, hand_sequence, tracks, fps=pose_sequence.fps or fps
         )
         if feature_fusion_mode == "fused":
             rgb_encoder: RgbEncoder = _create_adapter(  # type: ignore[assignment]

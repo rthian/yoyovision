@@ -5,6 +5,7 @@ from __future__ import annotations
 from yoyovision_workers.adapter_config import (
     build_pipeline_adapter_kwargs,
     uses_non_mock_perception,
+    uses_non_mock_temporal,
 )
 from yoyovision_workers.config import Settings
 
@@ -33,3 +34,18 @@ def test_uses_non_mock_perception_detects_mediapipe() -> None:
 def test_uses_non_mock_perception_false_for_all_mock() -> None:
     settings = Settings()
     assert uses_non_mock_perception(settings) is False
+
+
+def test_build_pipeline_adapter_kwargs_includes_torch_weights() -> None:
+    settings = Settings(
+        pipeline_temporal_event_adapter="torch",
+        pipeline_temporal_event_weights="/models/events.pt",
+    )
+    assert build_pipeline_adapter_kwargs(settings) == {
+        "temporal_event": {"weights_path": "/models/events.pt"}
+    }
+
+
+def test_uses_non_mock_temporal_for_torch_adapter() -> None:
+    settings = Settings(pipeline_temporal_event_adapter="torch")
+    assert uses_non_mock_temporal(settings) is True

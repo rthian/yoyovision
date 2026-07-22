@@ -48,6 +48,7 @@ from yoyovision_ml.events.artifact import read_predictions, write_predictions
 from yoyovision_ml.events.baselines import MajorityClassEventDetector, ThresholdRuleEventDetector
 from yoyovision_ml.events.checkpoint import EventModelMetadata, save_checkpoint
 from yoyovision_ml.events.config import InferenceConfig, TrainingConfig
+from yoyovision_ml.events.dataset_bridge import DatasetBridgeError, load_training_samples_from_dataset
 from yoyovision_ml.events.metrics import evaluate, evaluate_detector
 from yoyovision_ml.events.synthetic import generate_synthetic_dataset, generate_synthetic_sample
 from yoyovision_ml.events.train import player_grouped_split, train_model
@@ -107,12 +108,29 @@ def _training_config_from_args(args: argparse.Namespace) -> TrainingConfig:
 def _cmd_train(args: argparse.Namespace) -> int:
     config = _training_config_from_args(args)
     inference_config = InferenceConfig()
-    samples = generate_synthetic_dataset(
-        num_players=args.num_players,
-        clips_per_player=args.clips_per_player,
-        seed=args.seed,
-        num_events_per_clip=args.num_events_per_clip,
-    )
+    training_data_source = "synthetic"
+    if args.dataset_dir:
+        if not args.perception_dir:
+            print(
+                "error: --perception-dir is required when --dataset-dir is set.",
+                file=sys.stderr,
+            )
+            return 1
+        try:
+            samples = load_training_samples_from_dataset(
+                Path(args.dataset_dir), Path(args.perception_dir)
+            )
+        except (DatasetBridgeError, FileNotFoundError, ValueError) as exc:
+            print(f"error: {exc}", file=sys.stderr)
+            return 1
+        training_data_source = "dataset"
+    else:
+        samples = generate_synthetic_dataset(
+            num_players=args.num_players,
+            clips_per_player=args.clips_per_player,
+            seed=args.seed,
+            num_events_per_clip=args.num_events_per_clip,
+        )
 
     try:
         result = train_model(samples, config=config, inference_config=inference_config)
@@ -137,7 +155,7 @@ def _cmd_train(args: argparse.Namespace) -> int:
         val_sample_count=result.val_sample_count,
         test_sample_count=result.test_sample_count,
         torch_version=result.torch_module.__version__,
-        training_data_source="synthetic",
+        training_data_source=training_data_source,
     )
     weights_path, metadata_path = save_checkpoint(
         result.torch_module, result.model, metadata, Path(args.output_dir), args.name
@@ -353,10 +371,20 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     train_parser = subparsers.add_parser(
-        "train", help="Train the temporal trick-event TCN on a synthetic dataset."
+        "train", help="Train the temporal trick-event TCN on synthetic or dataset clips."
     )
     train_parser.add_argument("--output-dir", required=True)
     train_parser.add_argument("--name", required=True)
+    train_parser.add_argument(
+        "--dataset-dir",
+        default=None,
+        help="Prompt A dataset directory with records/ and manifest.json.",
+    )
+    train_parser.add_argument(
+        "--perception-dir",
+        default=None,
+        help="Directory of perception Parquet artefacts keyed by video_id.",
+    )
     _add_training_arguments(train_parser)
     train_parser.set_defaults(func=_cmd_train)
 

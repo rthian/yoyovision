@@ -60,6 +60,9 @@ class Settings(BaseSettings):
     pipeline_yoyo_adapter: str = "mock"
     pipeline_tracker_adapter: str = "mock"
     pipeline_temporal_event_adapter: str = "mock"
+    #: Path to a `.pt` checkpoint from `yoyovision-events train` when temporal adapter is torch.
+    #: Falls back to `YOYOVISION_TORCH_EVENT_WEIGHTS` inside the detector if unset.
+    pipeline_temporal_event_weights: str | None = None
     #: Kalman tracker tuning when `pipeline_tracker_adapter=kalman`.
     pipeline_tracker_max_gap_ms: int = 500
     pipeline_tracker_static_camera: bool = False

@@ -19,7 +19,7 @@ import sys
 from pathlib import Path
 
 from yoyovision_ml.dataset.importers.cvat import CvatImportError, import_cvat_yoyo_track
-from yoyovision_ml.dataset.io import load_dataset, save_manifest
+from yoyovision_ml.dataset.io import load_dataset, load_record, save_manifest, save_record
 from yoyovision_ml.dataset.ontology import default_ontology
 from yoyovision_ml.dataset.schema import SplitName
 from yoyovision_ml.dataset.splits import DEFAULT_RATIOS, generate_player_grouped_splits
@@ -135,6 +135,36 @@ def _cmd_import_cvat(args: argparse.Namespace) -> int:
     return 0
 
 
+
+
+def _cmd_merge_cvat(args: argparse.Namespace) -> int:
+    dataset_dir = Path(args.dataset_dir)
+    record_path = dataset_dir / "records" / f"{args.record_id}.json"
+    if not record_path.exists():
+        record_path = Path(args.record_id)
+    if not record_path.exists():
+        print(f"error: record not found: {args.record_id}", file=sys.stderr)
+        return 1
+
+    try:
+        annotations = import_cvat_yoyo_track(
+            Path(args.xml_path),
+            fps=args.fps,
+            frame_width=args.width,
+            frame_height=args.height,
+            track_label=args.track_label,
+        )
+    except CvatImportError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 1
+
+    record = load_record(record_path)
+    updated = record.model_copy(update={"yoyo_track": annotations})
+    out_path = save_record(dataset_dir, updated)
+    print(f"Merged {len(annotations)} yo-yo frames into {out_path}")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="yoyovision-dataset")
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -168,6 +198,19 @@ def build_parser() -> argparse.ArgumentParser:
     cvat_parser.add_argument("--track-label", default="yoyo")
     cvat_parser.add_argument("--output", default=None, help="Write JSON output to this path.")
     cvat_parser.set_defaults(func=_cmd_import_cvat)
+
+    merge_parser = subparsers.add_parser(
+        "merge-cvat",
+        help="Import a CVAT yo-yo track directly into a DatasetRecord.yoyo_track.",
+    )
+    merge_parser.add_argument("dataset_dir")
+    merge_parser.add_argument("record_id", help="Record id or records/<id>.json basename.")
+    merge_parser.add_argument("xml_path")
+    merge_parser.add_argument("--fps", type=float, required=True)
+    merge_parser.add_argument("--width", type=int, required=True)
+    merge_parser.add_argument("--height", type=int, required=True)
+    merge_parser.add_argument("--track-label", default="yoyo")
+    merge_parser.set_defaults(func=_cmd_merge_cvat)
 
     return parser
 

@@ -25,11 +25,16 @@ def uses_non_mock_perception(settings: Settings) -> bool:
     )
 
 
+def uses_non_mock_temporal(settings: Settings) -> bool:
+    return settings.pipeline_temporal_event_adapter != "mock"
+
+
 def ensure_real_adapters_registered(settings: Settings) -> None:
-    """Import `yoyovision_ml.perception` so mediapipe/kalman/pytorch/onnx
-    factories are registered before `run_analysis_pipeline` resolves names."""
+    """Register real adapter factories before `run_analysis_pipeline` resolves names."""
     if uses_non_mock_perception(settings):
         import yoyovision_ml.perception  # noqa: F401
+    if uses_non_mock_temporal(settings):
+        import yoyovision_ml.events  # noqa: F401
 
 
 def build_pipeline_adapter_kwargs(settings: Settings) -> Mapping[str, Mapping[str, object]]:
@@ -40,4 +45,8 @@ def build_pipeline_adapter_kwargs(settings: Settings) -> Mapping[str, Mapping[st
             "max_gap_ms": settings.pipeline_tracker_max_gap_ms,
             "static_camera": settings.pipeline_tracker_static_camera,
         }
+    if settings.pipeline_temporal_event_adapter == "torch":
+        weights_path = settings.pipeline_temporal_event_weights
+        if weights_path:
+            kwargs["temporal_event"] = {"weights_path": weights_path}
     return kwargs
