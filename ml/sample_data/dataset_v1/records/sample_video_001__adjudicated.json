@@ -1,0 +1,228 @@
+{
+  "record_id": "sample_video_001__adjudicated",
+  "video": {
+    "video_id": "sample_video_001",
+    "player_id": "player_a",
+    "division": "1A",
+    "relative_path": "videos/sample_video_001.mp4",
+    "checksum_sha256": "2da6bb196753e454f909125739b87171b07523ded5fc3eaaf7553551394206f0",
+    "duration_ms": 20000,
+    "width": 1920,
+    "height": 1080,
+    "source_fps": 30.0,
+    "is_variable_fps": false,
+    "frame_timestamps_ms": null,
+    "consent_reference": null,
+    "notes": "Synthetic sample video 1 for player_a (has two raw annotator passes + adjudication)."
+  },
+  "annotator_id": "annotator_alex",
+  "is_adjudicated": true,
+  "schema_version": "1.0.0",
+  "ontology_version": "dataset-ontology-v1",
+  "pose_landmarks": [],
+  "hand_landmarks": [],
+  "yoyo_track": [
+    {
+      "frame_ms": 0,
+      "point": {
+        "x": 0.4,
+        "y": 0.5
+      },
+      "bbox": null,
+      "visibility": "visible",
+      "confidence": null
+    },
+    {
+      "frame_ms": 3000,
+      "point": {
+        "x": 0.42,
+        "y": 0.5
+      },
+      "bbox": null,
+      "visibility": "visible",
+      "confidence": null
+    },
+    {
+      "frame_ms": 6000,
+      "point": {
+        "x": 0.44,
+        "y": 0.5
+      },
+      "bbox": null,
+      "visibility": "visible",
+      "confidence": null
+    },
+    {
+      "frame_ms": 9000,
+      "point": null,
+      "bbox": {
+        "x": 0.44,
+        "y": 0.5,
+        "width": 0.05,
+        "height": 0.05
+      },
+      "visibility": "partially_occluded",
+      "confidence": null
+    },
+    {
+      "frame_ms": 12000,
+      "point": {
+        "x": 0.48,
+        "y": 0.5
+      },
+      "bbox": null,
+      "visibility": "visible",
+      "confidence": null
+    },
+    {
+      "frame_ms": 15000,
+      "point": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "bbox": null,
+      "visibility": "visible",
+      "confidence": null
+    }
+  ],
+  "string_masks": [],
+  "trick_events": [
+    {
+      "event_id": "sv001_adj_evt1",
+      "label": "basic_mount",
+      "family": "mount",
+      "start_ms": 500,
+      "end_ms": 1500,
+      "outcome": "success",
+      "difficulty_band": "basic",
+      "confidence": 1.0,
+      "provenance": {
+        "annotator_id": "annotator_alex",
+        "source": "human",
+        "annotated_at": "2026-01-15T12:00:00Z",
+        "tool": "manual",
+        "tool_version": null,
+        "is_adjudicated": true,
+        "adjudicated_by": "lead_reviewer",
+        "adjudication_notes": "Merged from annotator_alex and annotator_bo; kept annotator_alex's boundaries where both agreed, added the missed catch_miss annotator_bo alone caught."
+      },
+      "notes": ""
+    },
+    {
+      "event_id": "sv001_adj_evt2",
+      "label": "eli_hop",
+      "family": "hop",
+      "start_ms": 2000,
+      "end_ms": 3200,
+      "outcome": "success",
+      "difficulty_band": "intermediate",
+      "confidence": 1.0,
+      "provenance": {
+        "annotator_id": "annotator_alex",
+        "source": "human",
+        "annotated_at": "2026-01-15T12:00:00Z",
+        "tool": "manual",
+        "tool_version": null,
+        "is_adjudicated": true,
+        "adjudicated_by": "lead_reviewer",
+        "adjudication_notes": "Merged from annotator_alex and annotator_bo; kept annotator_alex's boundaries where both agreed, added the missed catch_miss annotator_bo alone caught."
+      },
+      "notes": ""
+    },
+    {
+      "event_id": "sv001_adj_evt3",
+      "label": "double_or_nothing",
+      "family": "whip_catch",
+      "start_ms": 4000,
+      "end_ms": 5000,
+      "outcome": "success",
+      "difficulty_band": "advanced",
+      "confidence": 0.82,
+      "provenance": {
+        "annotator_id": "annotator_alex",
+        "source": "human",
+        "annotated_at": "2026-01-15T12:00:00Z",
+        "tool": "manual",
+        "tool_version": null,
+        "is_adjudicated": true,
+        "adjudicated_by": "lead_reviewer",
+        "adjudication_notes": "Merged from annotator_alex and annotator_bo; kept annotator_alex's boundaries where both agreed, added the missed catch_miss annotator_bo alone caught."
+      },
+      "notes": ""
+    },
+    {
+      "event_id": "sv001_adj_evt4",
+      "label": "missed_catch",
+      "family": "catch_miss",
+      "start_ms": 15000,
+      "end_ms": 15400,
+      "outcome": "miss",
+      "difficulty_band": "unknown",
+      "confidence": 1.0,
+      "provenance": {
+        "annotator_id": "annotator_alex",
+        "source": "human",
+        "annotated_at": "2026-01-15T12:00:00Z",
+        "tool": "manual",
+        "tool_version": null,
+        "is_adjudicated": true,
+        "adjudicated_by": "lead_reviewer",
+        "adjudication_notes": "Merged from annotator_alex and annotator_bo; kept annotator_alex's boundaries where both agreed, added the missed catch_miss annotator_bo alone caught."
+      },
+      "notes": "Adopted from annotator_bo's pass; annotator_alex initially missed this."
+    }
+  ],
+  "deductions": [
+    {
+      "deduction_id": "sv001_adj_ded1",
+      "type": "other",
+      "timestamp_ms": 15400,
+      "quantity": 1,
+      "confidence": 1.0,
+      "provenance": {
+        "annotator_id": "annotator_alex",
+        "source": "human",
+        "annotated_at": "2026-01-15T12:00:00Z",
+        "tool": "manual",
+        "tool_version": null,
+        "is_adjudicated": true,
+        "adjudicated_by": "lead_reviewer",
+        "adjudication_notes": "Merged from annotator_alex and annotator_bo; kept annotator_alex's boundaries where both agreed, added the missed catch_miss annotator_bo alone caught."
+      },
+      "notes": "Minor form deduction associated with the missed catch."
+    }
+  ],
+  "judge_clicks": [
+    {
+      "click_id": "sv001_click1",
+      "judge_id": "judge_1",
+      "timestamp_ms": 4050,
+      "associated_label": "double_or_nothing",
+      "notes": "Judge's real-time perceived start of the whip."
+    }
+  ],
+  "freestyle_evaluations": [
+    {
+      "judge_id": "judge_1",
+      "execution": 7.5,
+      "control": 7.0,
+      "trick_diversity": 8.0,
+      "space_use_emphasis": 6.5,
+      "music_choreography": 7.0,
+      "music_construction": 6.0,
+      "body_control": 7.5,
+      "showmanship": 8.0,
+      "provenance": {
+        "annotator_id": "judge_1",
+        "source": "human",
+        "annotated_at": "2026-01-15T12:00:00Z",
+        "tool": "manual",
+        "tool_version": null,
+        "is_adjudicated": false,
+        "adjudicated_by": null,
+        "adjudication_notes": ""
+      },
+      "notes": ""
+    }
+  ]
+}

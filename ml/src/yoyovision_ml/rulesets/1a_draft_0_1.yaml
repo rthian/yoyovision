@@ -1,0 +1,67 @@
+# =============================================================================
+# YoYoVision ruleset: 1a-draft-0.1
+#
+# UNOFFICIAL DRAFT. This configuration is authored for this application only.
+# It is NOT sourced from, endorsed by, or certified by IYYF, WYYC, or any
+# competition body, and it does not represent an official published trick
+# value table. It exists so the scoring engine has a versioned, editable
+# starting point. Judges/organizations should review and adjust every value
+# below before relying on it for anything beyond training-assistance use.
+# =============================================================================
+
+version: "1a-draft-0.1"
+is_official: false
+disclaimer: >
+  This ruleset is an unofficial, editable draft used for training and
+  judge-assistance purposes only. It is not certified by IYYF, WYYC, or any
+  competition body.
+
+difficulty_band_points:
+  basic: 1.0
+  intermediate: 2.0
+  advanced: 3.0
+  unknown: 1.0
+
+repeated_element_decay:
+  occurrence_multipliers: [1.0, 0.7, 0.4, 0.2]
+  high_risk_families:
+    - suicide
+    - whip_catch
+    - horizontal
+
+deduction_rules:
+  - type: yoyo_stop
+    points_per_occurrence: 2.0
+    max_occurrences_penalized: 6
+  - type: yoyo_change
+    points_per_occurrence: 3.0
+    max_occurrences_penalized: 3
+  - type: yoyo_detach
+    points_per_occurrence: 4.0
+    max_occurrences_penalized: 3
+  # Prompt D: never automatically applied -- see `requires_manual_confirmation`.
+  # A dangerous-play flag contributes zero score impact until a human
+  # reviewer explicitly confirms it happened.
+  - type: dangerous_play_review
+    points_per_occurrence: 5.0
+    max_occurrences_penalized: null
+    requires_manual_confirmation: true
+  - type: other
+    points_per_occurrence: 1.0
+    max_occurrences_penalized: null
+
+freestyle_evaluation_weights:
+  execution: 1.0
+  control: 1.0
+  trick_diversity: 1.0
+  space_use_emphasis: 1.0
+  music_choreography: 1.0
+  music_construction: 1.0
+  body_control: 1.0
+  showmanship: 1.0
+
+technical_scale_max: 100.0
+freestyle_evaluation_scale_max: 100.0
+technical_weight: 0.6
+freestyle_evaluation_weight: 0.4
+low_confidence_review_threshold: 0.55

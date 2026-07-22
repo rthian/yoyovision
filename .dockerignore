@@ -1,0 +1,30 @@
+## Python (huge local venvs/caches -- images install fresh via pip)
+**/.venv/
+**/__pycache__/
+**/*.egg-info/
+**/.mypy_cache/
+**/.ruff_cache/
+**/.pytest_cache/
+**/htmlcov/
+**/.coverage
+
+## Node / Next.js (frontend image builds with its own context + .dockerignore)
+frontend/node_modules/
+frontend/.next/
+frontend/coverage/
+frontend/playwright-report/
+frontend/test-results/
+
+## VCS / editor / env
+.git/
+.vscode/
+.idea/
+.DS_Store
+.env
+.env.local
+*.env.*.local
+
+## Never ship local dev media/storage into an image
+data/
+storage/
+media/

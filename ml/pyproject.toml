@@ -1,0 +1,88 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "yoyovision-ml"
+version = "0.1.0"
+description = "Shared domain models, ML interfaces, adapters, and scoring engine for YoYoVision."
+requires-python = ">=3.11"
+readme = "README.md"
+license = { text = "Proprietary" }
+dependencies = [
+  "numpy>=1.26",
+  "pandas>=2.2",
+  "pydantic>=2.6",
+  "PyYAML>=6.0",
+  "defusedxml>=0.7",
+  "pyarrow>=15.0",
+]
+
+[project.optional-dependencies]
+mediapipe = [
+  "mediapipe>=0.10",
+  "opencv-python-headless>=4.9",
+]
+torch = [
+  "torch>=2.2",
+]
+onnx = [
+  "onnxruntime>=1.17",
+]
+plotting = [
+  "matplotlib>=3.8",
+]
+dev = [
+  "pytest>=8.0",
+  "pytest-cov>=5.0",
+  "ruff>=0.4",
+  "mypy>=1.10",
+  "types-PyYAML",
+  "types-defusedxml",
+]
+
+[project.scripts]
+yoyovision-dataset = "yoyovision_ml.dataset.cli:main"
+yoyovision-perception = "yoyovision_ml.perception.cli:main"
+yoyovision-events = "yoyovision_ml.events.cli:main"
+yoyovision-scoring = "yoyovision_ml.scoring.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+yoyovision_ml = ["py.typed", "rulesets/*.yaml", "dataset/ontology/*.yaml"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[tool.mypy]
+# NOTE: kept >= requires-python's minimum (3.11) at runtime; this only
+# controls which typeshed/stub syntax mypy accepts. Pinned to 3.12 because
+# numpy's bundled .pyi stubs now use PEP 695 `type X = ...` aliases
+# unconditionally, which mypy cannot parse under python_version < 3.12.
+python_version = "3.12"
+strict = true
+warn_unused_ignores = true
+namespace_packages = true
+explicit_package_bases = true
+
+[[tool.mypy.overrides]]
+module = [
+  "boto3.*",
+  "botocore.*",
+  "cv2.*",
+  "mediapipe.*",
+  "torch.*",
+  "onnxruntime.*",
+  "pandas.*",
+  "matplotlib.*",
+]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

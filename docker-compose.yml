@@ -1,0 +1,134 @@
+version: "3.9"
+
+x-python-env: &python-env
+  # In-container URLs and storage paths are fixed here on purpose: a host
+  # `.env` tuned for bare-metal dev (localhost DB, /tmp/yoyovision_storage)
+  # must not override Docker service names or the shared storage volume.
+  DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-yoyovision}:${POSTGRES_PASSWORD:-yoyovision_dev_password}@postgres:5432/${POSTGRES_DB:-yoyovision}
+  REDIS_URL: redis://redis:6379/0
+  CELERY_BROKER_URL: redis://redis:6379/0
+  CELERY_RESULT_BACKEND: redis://redis:6379/1
+  STORAGE_BACKEND: local
+  STORAGE_LOCAL_ROOT: /data/storage
+  AUTH_JWT_SECRET: ${AUTH_JWT_SECRET:-change-me-dev-only-secret}
+  PIPELINE_VERSION: ${PIPELINE_VERSION:-0.1.0-dev}
+  RULESET_VERSION: ${RULESET_VERSION:-1a-draft-0.1}
+  ENVIRONMENT: ${ENVIRONMENT:-development}
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-yoyovision}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-yoyovision_dev_password}
+      POSTGRES_DB: ${POSTGRES_DB:-yoyovision}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-yoyovision}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${S3_ACCESS_KEY_ID:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${S3_SECRET_ACCESS_KEY:-minioadmin}
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+
+  api:
+    build:
+      context: .
+      dockerfile: api/Dockerfile
+    environment:
+      <<: *python-env
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./api:/app/api
+      - ./ml:/app/ml
+      - storage_data:/data/storage
+    command: >
+      sh -c "cd /app/api && alembic upgrade head &&
+             uvicorn yoyovision_api.main:app --host 0.0.0.0 --port 8000 --reload"
+
+  worker-cpu:
+    build:
+      context: .
+      dockerfile: workers/Dockerfile
+    environment:
+      <<: *python-env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./workers:/app/workers
+      - ./ml:/app/ml
+      - storage_data:/data/storage
+    command: >
+      celery -A yoyovision_workers.celery_app worker
+      -Q cpu -n cpu-worker@%h --loglevel=info
+
+  worker-gpu:
+    build:
+      context: .
+      dockerfile: workers/Dockerfile
+    environment:
+      <<: *python-env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./workers:/app/workers
+      - ./ml:/app/ml
+      - storage_data:/data/storage
+    command: >
+      celery -A yoyovision_workers.celery_app worker
+      -Q gpu -n gpu-worker@%h --loglevel=info --concurrency=1
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    environment:
+      NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:8000}
+    ports:
+      - "3000:3000"
+    depends_on:
+      - api
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - /app/.next
+
+volumes:
+  postgres_data:
+  minio_data:
+  storage_data:

@@ -1,0 +1,136 @@
+{
+  "record_id": "sample_video_001__annotator_alex",
+  "video": {
+    "video_id": "sample_video_001",
+    "player_id": "player_a",
+    "division": "1A",
+    "relative_path": "videos/sample_video_001.mp4",
+    "checksum_sha256": "2da6bb196753e454f909125739b87171b07523ded5fc3eaaf7553551394206f0",
+    "duration_ms": 20000,
+    "width": 1920,
+    "height": 1080,
+    "source_fps": 30.0,
+    "is_variable_fps": false,
+    "frame_timestamps_ms": null,
+    "consent_reference": null,
+    "notes": "Synthetic sample video 1 for player_a (has two raw annotator passes + adjudication)."
+  },
+  "annotator_id": "annotator_alex",
+  "is_adjudicated": false,
+  "schema_version": "1.0.0",
+  "ontology_version": "dataset-ontology-v1",
+  "pose_landmarks": [],
+  "hand_landmarks": [],
+  "yoyo_track": [
+    {
+      "frame_ms": 0,
+      "point": {
+        "x": 0.4,
+        "y": 0.5
+      },
+      "bbox": null,
+      "visibility": "visible",
+      "confidence": null
+    },
+    {
+      "frame_ms": 3000,
+      "point": {
+        "x": 0.42,
+        "y": 0.5
+      },
+      "bbox": null,
+      "visibility": "visible",
+      "confidence": null
+    },
+    {
+      "frame_ms": 6000,
+      "point": {
+        "x": 0.44,
+        "y": 0.5
+      },
+      "bbox": null,
+      "visibility": "visible",
+      "confidence": null
+    },
+    {
+      "frame_ms": 9000,
+      "point": null,
+      "bbox": {
+        "x": 0.44,
+        "y": 0.5,
+        "width": 0.05,
+        "height": 0.05
+      },
+      "visibility": "partially_occluded",
+      "confidence": null
+    },
+    {
+      "frame_ms": 12000,
+      "point": {
+        "x": 0.48,
+        "y": 0.5
+      },
+      "bbox": null,
+      "visibility": "visible",
+      "confidence": null
+    },
+    {
+      "frame_ms": 15000,
+      "point": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "bbox": null,
+      "visibility": "visible",
+      "confidence": null
+    }
+  ],
+  "string_masks": [],
+  "trick_events": [
+    {
+      "event_id": "sv001_alex_evt1",
+      "label": "basic_mount",
+      "family": "mount",
+      "start_ms": 500,
+      "end_ms": 1500,
+      "outcome": "success",
+      "difficulty_band": "basic",
+      "confidence": 1.0,
+      "provenance": {
+        "annotator_id": "annotator_alex",
+        "source": "human",
+        "annotated_at": "2026-01-15T12:00:00Z",
+        "tool": "manual",
+        "tool_version": null,
+        "is_adjudicated": false,
+        "adjudicated_by": null,
+        "adjudication_notes": ""
+      },
+      "notes": ""
+    },
+    {
+      "event_id": "sv001_alex_evt2",
+      "label": "eli_hop",
+      "family": "hop",
+      "start_ms": 2000,
+      "end_ms": 3200,
+      "outcome": "success",
+      "difficulty_band": "intermediate",
+      "confidence": 1.0,
+      "provenance": {
+        "annotator_id": "annotator_alex",
+        "source": "human",
+        "annotated_at": "2026-01-15T12:00:00Z",
+        "tool": "manual",
+        "tool_version": null,
+        "is_adjudicated": false,
+        "adjudicated_by": null,
+        "adjudication_notes": ""
+      },
+      "notes": ""
+    }
+  ],
+  "deductions": [],
+  "judge_clicks": [],
+  "freestyle_evaluations": []
+}

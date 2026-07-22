@@ -1,0 +1,149 @@
+{
+  "record_id": "sample_video_003__adjudicated",
+  "video": {
+    "video_id": "sample_video_003",
+    "player_id": "player_b",
+    "division": "1A",
+    "relative_path": "videos/sample_video_003.mp4",
+    "checksum_sha256": "faeee77072a71b1b2f5e41b84db72deb6e6b356b898032fa86da76daab92df88",
+    "duration_ms": 18000,
+    "width": 1280,
+    "height": 720,
+    "source_fps": 25.0,
+    "is_variable_fps": false,
+    "frame_timestamps_ms": null,
+    "consent_reference": null,
+    "notes": "Synthetic sample video for player_b, on a different camera (720p/25fps)."
+  },
+  "annotator_id": "annotator_bo",
+  "is_adjudicated": true,
+  "schema_version": "1.0.0",
+  "ontology_version": "dataset-ontology-v1",
+  "pose_landmarks": [],
+  "hand_landmarks": [],
+  "yoyo_track": [
+    {
+      "frame_ms": 0,
+      "point": {
+        "x": 0.4,
+        "y": 0.5
+      },
+      "bbox": null,
+      "visibility": "visible",
+      "confidence": null
+    },
+    {
+      "frame_ms": 3000,
+      "point": {
+        "x": 0.425,
+        "y": 0.5
+      },
+      "bbox": null,
+      "visibility": "visible",
+      "confidence": null
+    },
+    {
+      "frame_ms": 6000,
+      "point": null,
+      "bbox": {
+        "x": 0.44,
+        "y": 0.5,
+        "width": 0.05,
+        "height": 0.05
+      },
+      "visibility": "partially_occluded",
+      "confidence": null
+    },
+    {
+      "frame_ms": 9000,
+      "point": {
+        "x": 0.475,
+        "y": 0.5
+      },
+      "bbox": null,
+      "visibility": "visible",
+      "confidence": null
+    },
+    {
+      "frame_ms": 12000,
+      "point": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "bbox": null,
+      "visibility": "visible",
+      "confidence": null
+    }
+  ],
+  "string_masks": [],
+  "trick_events": [
+    {
+      "event_id": "sv003_evt1",
+      "label": "brain_twister_mount",
+      "family": "mount",
+      "start_ms": 400,
+      "end_ms": 1600,
+      "outcome": "success",
+      "difficulty_band": "intermediate",
+      "confidence": 1.0,
+      "provenance": {
+        "annotator_id": "annotator_bo",
+        "source": "human",
+        "annotated_at": "2026-01-15T12:00:00Z",
+        "tool": "manual",
+        "tool_version": null,
+        "is_adjudicated": true,
+        "adjudicated_by": "lead_reviewer",
+        "adjudication_notes": "Merged from annotator_alex and annotator_bo; kept annotator_alex's boundaries where both agreed, added the missed catch_miss annotator_bo alone caught."
+      },
+      "notes": ""
+    },
+    {
+      "event_id": "sv003_evt2",
+      "label": "trapeze_bind",
+      "family": "bind",
+      "start_ms": 16500,
+      "end_ms": 17800,
+      "outcome": "success",
+      "difficulty_band": "basic",
+      "confidence": 1.0,
+      "provenance": {
+        "annotator_id": "annotator_bo",
+        "source": "human",
+        "annotated_at": "2026-01-15T12:00:00Z",
+        "tool": "manual",
+        "tool_version": null,
+        "is_adjudicated": true,
+        "adjudicated_by": "lead_reviewer",
+        "adjudication_notes": "Merged from annotator_alex and annotator_bo; kept annotator_alex's boundaries where both agreed, added the missed catch_miss annotator_bo alone caught."
+      },
+      "notes": ""
+    }
+  ],
+  "deductions": [],
+  "judge_clicks": [],
+  "freestyle_evaluations": [
+    {
+      "judge_id": "judge_2",
+      "execution": 6.0,
+      "control": 6.5,
+      "trick_diversity": 5.5,
+      "space_use_emphasis": null,
+      "music_choreography": null,
+      "music_construction": null,
+      "body_control": 6.0,
+      "showmanship": null,
+      "provenance": {
+        "annotator_id": "judge_2",
+        "source": "human",
+        "annotated_at": "2026-01-15T12:00:00Z",
+        "tool": "manual",
+        "tool_version": null,
+        "is_adjudicated": false,
+        "adjudicated_by": null,
+        "adjudication_notes": ""
+      },
+      "notes": "Partial scorecard: judge_2 did not evaluate space use / music / showmanship."
+    }
+  ]
+}

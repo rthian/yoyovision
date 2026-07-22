@@ -1,0 +1,18 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+}
+
+body {
+  @apply bg-surface-alt text-content-default antialiased;
+}
+
+/* Focusable elements use one ring treatment per the workspace design.md
+   rule: brand-primary-soft at 3px with a 3px offset. */
+:focus-visible {
+  outline: 3px solid #b1eaba;
+  outline-offset: 3px;
+}

@@ -1,0 +1,156 @@
+{
+  "record_id": "sample_video_002__annotator_alex",
+  "video": {
+    "video_id": "sample_video_002",
+    "player_id": "player_a",
+    "division": "1A",
+    "relative_path": "videos/sample_video_002.mp4",
+    "checksum_sha256": "e4eea1433705b0ce6c3f90fc04672182bc737d2980792bc44f3b133a15d05632",
+    "duration_ms": 15000,
+    "width": 1920,
+    "height": 1080,
+    "source_fps": 30.0,
+    "is_variable_fps": false,
+    "frame_timestamps_ms": null,
+    "consent_reference": null,
+    "notes": "Synthetic sample video 2 for player_a (single-annotator pass, no adjudication needed)."
+  },
+  "annotator_id": "annotator_alex",
+  "is_adjudicated": false,
+  "schema_version": "1.0.0",
+  "ontology_version": "dataset-ontology-v1",
+  "pose_landmarks": [],
+  "hand_landmarks": [],
+  "yoyo_track": [
+    {
+      "frame_ms": 0,
+      "point": {
+        "x": 0.4,
+        "y": 0.5
+      },
+      "bbox": null,
+      "visibility": "visible",
+      "confidence": null
+    },
+    {
+      "frame_ms": 3000,
+      "point": {
+        "x": 0.4333,
+        "y": 0.5
+      },
+      "bbox": null,
+      "visibility": "visible",
+      "confidence": null
+    },
+    {
+      "frame_ms": 6000,
+      "point": null,
+      "bbox": {
+        "x": 0.44,
+        "y": 0.5,
+        "width": 0.05,
+        "height": 0.05
+      },
+      "visibility": "partially_occluded",
+      "confidence": null
+    },
+    {
+      "frame_ms": 9000,
+      "point": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "bbox": null,
+      "visibility": "visible",
+      "confidence": null
+    }
+  ],
+  "string_masks": [],
+  "trick_events": [
+    {
+      "event_id": "sv002_evt1",
+      "label": "basic_mount",
+      "family": "mount",
+      "start_ms": 300,
+      "end_ms": 1200,
+      "outcome": "success",
+      "difficulty_band": "basic",
+      "confidence": 1.0,
+      "provenance": {
+        "annotator_id": "annotator_alex",
+        "source": "human",
+        "annotated_at": "2026-01-15T12:00:00Z",
+        "tool": "manual",
+        "tool_version": null,
+        "is_adjudicated": false,
+        "adjudicated_by": null,
+        "adjudication_notes": ""
+      },
+      "notes": ""
+    },
+    {
+      "event_id": "sv002_evt2",
+      "label": "unclassified_element",
+      "family": "unknown_technical_element",
+      "start_ms": 6000,
+      "end_ms": 6800,
+      "outcome": "uncertain",
+      "difficulty_band": "unknown",
+      "confidence": 1.0,
+      "provenance": {
+        "annotator_id": "annotator_alex",
+        "source": "human",
+        "annotated_at": "2026-01-15T12:00:00Z",
+        "tool": "manual",
+        "tool_version": null,
+        "is_adjudicated": false,
+        "adjudicated_by": null,
+        "adjudication_notes": ""
+      },
+      "notes": "Annotator was unsure whether this was a novel horizontal variant."
+    },
+    {
+      "event_id": "sv002_evt3",
+      "label": "yoyo_stopped_spinning",
+      "family": "yoyo_stop",
+      "start_ms": 10000,
+      "end_ms": 10200,
+      "outcome": "miss",
+      "difficulty_band": "unknown",
+      "confidence": 1.0,
+      "provenance": {
+        "annotator_id": "annotator_alex",
+        "source": "human",
+        "annotated_at": "2026-01-15T12:00:00Z",
+        "tool": "manual",
+        "tool_version": null,
+        "is_adjudicated": false,
+        "adjudicated_by": null,
+        "adjudication_notes": ""
+      },
+      "notes": ""
+    }
+  ],
+  "deductions": [
+    {
+      "deduction_id": "sv002_ded1",
+      "type": "yoyo_stop",
+      "timestamp_ms": 10200,
+      "quantity": 1,
+      "confidence": 1.0,
+      "provenance": {
+        "annotator_id": "annotator_alex",
+        "source": "human",
+        "annotated_at": "2026-01-15T12:00:00Z",
+        "tool": "manual",
+        "tool_version": null,
+        "is_adjudicated": false,
+        "adjudicated_by": null,
+        "adjudication_notes": ""
+      },
+      "notes": ""
+    }
+  ],
+  "judge_clicks": [],
+  "freestyle_evaluations": []
+}

@@ -1,0 +1,63 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "yoyovision-workers"
+version = "0.1.0"
+description = "YoYoVision Celery workers: runs the offline analysis pipeline (yoyovision-ml) and persists results to Postgres."
+requires-python = ">=3.11"
+readme = "README.md"
+license = { text = "Proprietary" }
+dependencies = [
+  "yoyovision-ml",
+  "celery>=5.4",
+  "redis>=5.0",
+  "sqlalchemy[asyncio]>=2.0",
+  "asyncpg>=0.29",
+  "pydantic-settings>=2.2",
+  "structlog>=24.1",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.0",
+  "pytest-asyncio>=0.23",
+  "pytest-cov>=5.0",
+  "aiosqlite>=0.20",
+  "ruff>=0.4",
+  "mypy>=1.10",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+yoyovision_workers = ["py.typed"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[tool.mypy]
+# NOTE: kept >= requires-python's minimum (3.11) at runtime; this only
+# controls which typeshed/stub syntax mypy accepts. Pinned to 3.12 because
+# numpy's bundled .pyi stubs (a transitive dependency via yoyovision-ml) now
+# use PEP 695 `type X = ...` aliases unconditionally, which mypy cannot
+# parse under python_version < 3.12.
+python_version = "3.12"
+strict = true
+warn_unused_ignores = true
+namespace_packages = true
+explicit_package_bases = true
+
+[[tool.mypy.overrides]]
+module = ["celery.*", "kombu.*"]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"

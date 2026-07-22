@@ -1,0 +1,308 @@
+/**
+ * Domain types mirroring `yoyovision_api.schemas` (Pydantic v2) and
+ * `yoyovision_ml.domain` (StrEnum) response shapes byte-for-byte, so the
+ * frontend never guesses at API contracts. Keep in sync manually until an
+ * OpenAPI codegen step is introduced -- see docs/architecture.md.
+ */
+
+export type VideoStatus =
+  | "uploaded"
+  | "validating"
+  | "ready"
+  | "rejected"
+  | "deleted";
+
+export type JobStatus =
+  | "pending"
+  | "running"
+  | "completed"
+  | "failed"
+  | "cancelled";
+
+export type PipelineStage =
+  | "queued"
+  | "media_validation"
+  | "preprocessing"
+  | "pose_extraction"
+  | "hand_extraction"
+  | "yoyo_detection"
+  | "tracking"
+  | "string_analysis"
+  | "feature_extraction"
+  | "temporal_event_detection"
+  | "scoring"
+  | "done";
+
+export type EventFamily =
+  | "mount"
+  | "hop"
+  | "laceration"
+  | "whip_catch"
+  | "slack"
+  | "suicide"
+  | "rejection"
+  | "roll"
+  | "underpass"
+  | "overpass"
+  | "bind"
+  | "return"
+  | "regeneration"
+  | "horizontal"
+  | "fingerspin"
+  | "body_trick"
+  | "control_miss"
+  | "landing_miss"
+  | "catch_miss"
+  | "yoyo_stop"
+  | "yoyo_change"
+  | "yoyo_detach"
+  | "unknown_technical_element";
+
+export const EVENT_FAMILIES: EventFamily[] = [
+  "mount",
+  "hop",
+  "laceration",
+  "whip_catch",
+  "slack",
+  "suicide",
+  "rejection",
+  "roll",
+  "underpass",
+  "overpass",
+  "bind",
+  "return",
+  "regeneration",
+  "horizontal",
+  "fingerspin",
+  "body_trick",
+  "control_miss",
+  "landing_miss",
+  "catch_miss",
+  "yoyo_stop",
+  "yoyo_change",
+  "yoyo_detach",
+  "unknown_technical_element",
+];
+
+export type Outcome = "success" | "miss" | "uncertain";
+
+export type DifficultyBand = "basic" | "intermediate" | "advanced" | "unknown";
+
+export const DIFFICULTY_BANDS: DifficultyBand[] = [
+  "basic",
+  "intermediate",
+  "advanced",
+  "unknown",
+];
+
+export type EventSource = "model" | "human" | "imported";
+
+export type ReviewStatus = "pending" | "confirmed" | "rejected" | "edited";
+
+export type DeductionType =
+  | "yoyo_stop"
+  | "yoyo_change"
+  | "yoyo_detach"
+  | "dangerous_play_review"
+  | "other";
+
+export const DEDUCTION_TYPES: DeductionType[] = [
+  "yoyo_stop",
+  "yoyo_change",
+  "yoyo_detach",
+  "dangerous_play_review",
+  "other",
+];
+
+export interface VideoAsset {
+  id: string;
+  owner_id: string;
+  original_filename: string;
+  mime_type: string;
+  duration_ms: number | null;
+  width: number | null;
+  height: number | null;
+  fps: number | null;
+  file_size: number;
+  status: VideoStatus;
+  created_at: string;
+  deleted_at: string | null;
+}
+
+export interface AnalysisJob {
+  id: string;
+  video_id: string;
+  status: JobStatus;
+  progress: number;
+  current_stage: PipelineStage | null;
+  error_code: string | null;
+  error_message: string | null;
+  pipeline_version: string;
+  created_at: string;
+  started_at: string | null;
+  completed_at: string | null;
+
+  /** Production inference fields (Prompt F). `model_versions` only ever
+   * holds `name@version` strings, never a local filesystem path. */
+  model_versions: Record<string, string> | null;
+  device: string | null;
+  runtime_versions: Record<string, string> | null;
+  stage_durations_ms: Record<string, number> | null;
+  /** Shadow jobs run the full pipeline and persist real events/deductions/
+   * score, but must never be presented as a video's official result. */
+  is_shadow: boolean;
+  cancel_requested: boolean;
+  retry_count: number;
+}
+
+export interface AnalysisEvent {
+  id: string;
+  analysis_id: string;
+  label: string;
+  family: EventFamily;
+  start_ms: number;
+  end_ms: number;
+  confidence: number;
+  outcome: Outcome;
+  difficulty_band: DifficultyBand;
+  source: EventSource;
+  review_status: ReviewStatus;
+  model_name: string | null;
+  model_version: string | null;
+  evidence_json: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AnalysisEventCreate {
+  label: string;
+  family: EventFamily;
+  start_ms: number;
+  end_ms: number;
+  confidence?: number;
+  outcome: Outcome;
+  difficulty_band?: DifficultyBand;
+  notes?: string;
+}
+
+export interface AnalysisEventUpdate {
+  label?: string;
+  family?: EventFamily;
+  start_ms?: number;
+  end_ms?: number;
+  confidence?: number;
+  outcome?: Outcome;
+  difficulty_band?: DifficultyBand;
+  review_status?: ReviewStatus;
+}
+
+export interface MajorDeduction {
+  id: string;
+  analysis_id: string;
+  type: DeductionType;
+  timestamp_ms: number;
+  quantity: number;
+  points: number;
+  confidence: number;
+  source: EventSource;
+  review_status: ReviewStatus;
+}
+
+export interface MajorDeductionCreate {
+  type: DeductionType;
+  timestamp_ms: number;
+  quantity?: number;
+  points: number;
+}
+
+export interface MajorDeductionUpdate {
+  type?: DeductionType;
+  timestamp_ms?: number;
+  quantity?: number;
+  points?: number;
+  review_status?: ReviewStatus;
+}
+
+export interface FreestyleEvaluation {
+  execution: number | null;
+  control: number | null;
+  trick_diversity: number | null;
+  space_use_emphasis: number | null;
+  music_choreography: number | null;
+  music_construction: number | null;
+  body_control: number | null;
+  showmanship: number | null;
+  source: EventSource;
+  notes: string;
+}
+
+export interface FreestyleEvaluationUpsert {
+  execution?: number | null;
+  control?: number | null;
+  trick_diversity?: number | null;
+  space_use_emphasis?: number | null;
+  music_choreography?: number | null;
+  music_construction?: number | null;
+  body_control?: number | null;
+  showmanship?: number | null;
+  notes?: string;
+}
+
+export const FREESTYLE_EVALUATION_FIELDS: {
+  key: keyof FreestyleEvaluationUpsert;
+  label: string;
+}[] = [
+  { key: "execution", label: "Execution" },
+  { key: "control", label: "Control" },
+  { key: "trick_diversity", label: "Trick diversity" },
+  { key: "space_use_emphasis", label: "Space use & emphasis" },
+  { key: "music_choreography", label: "Music choreography" },
+  { key: "music_construction", label: "Music construction" },
+  { key: "body_control", label: "Body control" },
+  { key: "showmanship", label: "Showmanship" },
+];
+
+export interface ScoreBreakdown {
+  technical_raw: number;
+  technical_scaled: number;
+  freestyle_evaluation_raw: number;
+  freestyle_evaluation_scaled: number;
+  major_deductions: number;
+  final_score: number;
+  confidence: number;
+  ruleset_version: string;
+  warnings: string[];
+}
+
+export interface TokenResponse {
+  access_token: string;
+  token_type: string;
+}
+
+export interface LoginRequest {
+  email: string;
+  password: string;
+}
+
+export interface Ruleset {
+  version: string;
+  is_official: boolean;
+  disclaimer: string;
+  difficulty_band_points: Record<string, number>;
+  repeated_element_decay: Record<string, unknown>;
+  deduction_rules: {
+    type: DeductionType;
+    points_per_occurrence: number;
+    max_occurrences_penalized: number | null;
+    requires_manual_confirmation: boolean;
+  }[];
+  freestyle_evaluation_weights: Record<string, number>;
+  technical_scale_max: number;
+  freestyle_evaluation_scale_max: number;
+}
+
+/** Shape of FastAPI's default error body: `{"detail": "..."}` or
+ * `{"detail": {"code": "...", "message": "..."}}` (our own validation errors). */
+export interface ApiErrorBody {
+  detail?: string | { code?: string; message?: string } | unknown;
+}

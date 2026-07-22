@@ -1,0 +1,152 @@
+# =============================================================================
+# YoYoVision dataset event ontology: v1
+#
+# UNOFFICIAL, EXPANDABLE label set for 1A dataset annotation. This maps
+# specific, human-readable trick labels onto the fixed EventFamily vocabulary
+# already defined in `yoyovision_ml.domain`. It is NOT an official IYYF/WYYC
+# trick-name registry -- label names below are common community terms chosen
+# only to give annotators concrete examples per family. Add labels as real
+# annotated data is collected; bump `version` whenever a label is added,
+# renamed, or reassigned to a different family (existing datasets keep the
+# `ontology_version` they were annotated against -- see docs/data_model.md).
+# =============================================================================
+
+version: "dataset-ontology-v1"
+
+labels:
+  - label: "basic_mount"
+    family: mount
+    description: "Standard starting mount onto the string."
+    aliases: ["basic_start"]
+  - label: "brain_twister_mount"
+    family: mount
+    description: "Mount variant with a wrap/twist entry."
+    aliases: []
+
+  - label: "eli_hop"
+    family: hop
+    description: "Single hop of the yo-yo off the string plane."
+    aliases: []
+  - label: "double_hop"
+    family: hop
+    description: "Two consecutive hops before returning to the string."
+    aliases: []
+
+  - label: "green_triangle"
+    family: laceration
+    description: "String hits/wraps around a limb, forming a triangular string pattern."
+    aliases: []
+
+  - label: "double_or_nothing"
+    family: whip_catch
+    description: "Whip into a doubled string, caught on re-entry."
+    aliases: []
+  - label: "iron_whip"
+    family: whip_catch
+    description: "Whip-style catch with an extended airborne segment."
+    aliases: []
+
+  - label: "matrix_slack"
+    family: slack
+    description: "Slack-string pattern manipulated around the body."
+    aliases: []
+
+  - label: "suicide_rewind"
+    family: suicide
+    description: "Yo-yo released from the hand and caught after full extension."
+    aliases: []
+
+  - label: "basic_rejection"
+    family: rejection
+    description: "String rejection redirecting yo-yo trajectory."
+    aliases: []
+
+  - label: "front_roll"
+    family: roll
+    description: "Yo-yo rolled along an extended arm/body surface."
+    aliases: []
+
+  - label: "one_and_a_half_underpass"
+    family: underpass
+    description: "Underpass string maneuver, one-and-a-half rotations."
+    aliases: []
+
+  - label: "basic_overpass"
+    family: overpass
+    description: "Overpass string maneuver."
+    aliases: []
+
+  - label: "trapeze_bind"
+    family: bind
+    description: "Bind executed from a trapeze position to stop the yo-yo spinning."
+    aliases: []
+
+  - label: "basic_return"
+    family: return
+    description: "Yo-yo returned to the hand via string tension/tug."
+    aliases: []
+
+  - label: "regeneration_throw"
+    family: regeneration
+    description: "Yo-yo re-thrown from a caught position without full stop."
+    aliases: []
+
+  - label: "horizontal_orbit"
+    family: horizontal
+    description: "Sustained horizontal-plane play."
+    aliases: []
+
+  - label: "basic_fingerspin"
+    family: fingerspin
+    description: "Yo-yo spun balanced on a fingertip."
+    aliases: []
+
+  - label: "around_the_body"
+    family: body_trick
+    description: "String/yo-yo routed around the player's body."
+    aliases: []
+
+  # Mistake / equipment families: labels are the observed failure mode, not a "trick".
+  - label: "dropped_control"
+    family: control_miss
+    description: "Player loses control of the string pattern without a clean recovery."
+    aliases: []
+  - label: "missed_landing"
+    family: landing_miss
+    description: "Attempted landing (e.g. onto a finger, string, or hand) is missed."
+    aliases: []
+  - label: "missed_catch"
+    family: catch_miss
+    description: "Attempted catch of the yo-yo body is missed."
+    aliases: []
+  - label: "yoyo_stopped_spinning"
+    family: yoyo_stop
+    description: "Yo-yo visibly stops spinning mid-routine."
+    aliases: []
+  - label: "yoyo_swapped"
+    family: yoyo_change
+    description: "Player changes/discards the yo-yo mid-routine."
+    aliases: []
+  - label: "yoyo_detached"
+    family: yoyo_detach
+    description: "Yo-yo detaches from the string entirely."
+    aliases: []
+  - label: "unclassified_element"
+    family: unknown_technical_element
+    description: "Element the annotator could not confidently classify; flagged for expert review."
+    aliases: []
+
+visibility_states:
+  - visible
+  - partially_occluded
+  - fully_occluded
+  - outside_frame
+  - unlabelled
+
+# Families whose events are allowed to overlap in time with another event of
+# the SAME family for the same performer (e.g. a body_trick can legitimately
+# contain a nested hop). Any other same-family overlap is flagged by the
+# dataset validator as a likely annotation error, not a hard product rule.
+overlap_allowed_families:
+  - body_trick
+  - horizontal

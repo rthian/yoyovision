@@ -1,0 +1,45 @@
+## Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+.venv/
+venv/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+htmlcov/
+.coverage
+dist/
+build/
+
+## Node / Next.js
+node_modules/
+.next/
+out/
+frontend/.turbo/
+frontend/coverage/
+frontend/playwright-report/
+frontend/test-results/
+
+## Env
+.env
+.env.local
+*.env.*.local
+
+## Data / media (never commit uploaded or derived media)
+data/
+storage/
+media/
+*.mp4
+*.mov
+*.webm
+
+## OS / editor
+.DS_Store
+.vscode/
+.idea/
+
+## Alembic (keep versions, ignore local sqlite if any)
+*.db
+*.sqlite3

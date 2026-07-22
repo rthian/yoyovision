@@ -1,0 +1,195 @@
+"""Pydantic v2 request/response schemas for the public API."""
+
+from __future__ import annotations
+
+from datetime import datetime
+
+from pydantic import BaseModel, ConfigDict, Field
+from yoyovision_ml.domain import (
+    DeductionType,
+    DifficultyBand,
+    EventFamily,
+    JobStatus,
+    Outcome,
+    PipelineStage,
+    ReviewStatus,
+    Source,
+    VideoStatus,
+)
+
+
+class VideoAssetRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    owner_id: str
+    original_filename: str
+    mime_type: str
+    duration_ms: int | None
+    width: int | None
+    height: int | None
+    fps: float | None
+    file_size: int
+    status: VideoStatus
+    created_at: datetime
+    deleted_at: datetime | None
+
+
+class AnalysisJobRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    video_id: str
+    status: JobStatus
+    progress: float
+    current_stage: PipelineStage | None
+    error_code: str | None
+    error_message: str | None
+    pipeline_version: str
+    created_at: datetime
+    started_at: datetime | None
+    completed_at: datetime | None
+
+    #: Prompt F (production inference) fields. `model_versions` only ever
+    #: holds `name@version` strings (never a local filesystem path -- see
+    #: `ModelRegistry.describe`).
+    model_versions: dict[str, str] | None = None
+    device: str | None = None
+    runtime_versions: dict[str, str] | None = None
+    stage_durations_ms: dict[str, float] | None = None
+    #: Shadow jobs run the full pipeline and persist real results, but are
+    #: never meant to be treated as a video's official/canonical score.
+    is_shadow: bool = False
+    cancel_requested: bool = False
+    retry_count: int = 0
+
+
+class AnalysisEventRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    analysis_id: str
+    label: str
+    family: EventFamily
+    start_ms: int
+    end_ms: int
+    confidence: float
+    outcome: Outcome
+    difficulty_band: DifficultyBand
+    source: Source
+    review_status: ReviewStatus
+    model_name: str | None
+    model_version: str | None
+    evidence_json: dict[str, object]
+    created_at: datetime
+    updated_at: datetime
+
+
+class AnalysisEventCreate(BaseModel):
+    """Used when a human adds a new event manually during review."""
+
+    label: str = Field(min_length=1, max_length=128)
+    family: EventFamily
+    start_ms: int = Field(ge=0)
+    end_ms: int = Field(ge=0)
+    confidence: float = Field(default=1.0, ge=0.0, le=1.0)
+    outcome: Outcome
+    difficulty_band: DifficultyBand = DifficultyBand.UNKNOWN
+    notes: str | None = None
+
+
+class AnalysisEventUpdate(BaseModel):
+    """Partial update -- any provided field is edited; source becomes `human`
+    if not already, and review_status moves to `edited` unless explicitly set."""
+
+    label: str | None = Field(default=None, min_length=1, max_length=128)
+    family: EventFamily | None = None
+    start_ms: int | None = Field(default=None, ge=0)
+    end_ms: int | None = Field(default=None, ge=0)
+    confidence: float | None = Field(default=None, ge=0.0, le=1.0)
+    outcome: Outcome | None = None
+    difficulty_band: DifficultyBand | None = None
+    review_status: ReviewStatus | None = None
+
+
+class MajorDeductionRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    analysis_id: str
+    type: DeductionType
+    timestamp_ms: int
+    quantity: int
+    points: float
+    confidence: float
+    source: Source
+    review_status: ReviewStatus
+
+
+class MajorDeductionCreate(BaseModel):
+    type: DeductionType
+    timestamp_ms: int = Field(ge=0)
+    quantity: int = Field(default=1, ge=1)
+    points: float = Field(ge=0.0)
+
+
+class MajorDeductionUpdate(BaseModel):
+    type: DeductionType | None = None
+    timestamp_ms: int | None = Field(default=None, ge=0)
+    quantity: int | None = Field(default=None, ge=1)
+    points: float | None = Field(default=None, ge=0.0)
+    review_status: ReviewStatus | None = None
+
+
+class FreestyleEvaluationRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    execution: float | None
+    control: float | None
+    trick_diversity: float | None
+    space_use_emphasis: float | None
+    music_choreography: float | None
+    music_construction: float | None
+    body_control: float | None
+    showmanship: float | None
+    source: Source
+    notes: str
+
+
+class FreestyleEvaluationUpsert(BaseModel):
+    """Manual entry per MVP scope ("Freestyle Evaluation placeholders and
+    manual values"); every field 0-10, all optional (partial entry allowed)."""
+
+    execution: float | None = Field(default=None, ge=0.0, le=10.0)
+    control: float | None = Field(default=None, ge=0.0, le=10.0)
+    trick_diversity: float | None = Field(default=None, ge=0.0, le=10.0)
+    space_use_emphasis: float | None = Field(default=None, ge=0.0, le=10.0)
+    music_choreography: float | None = Field(default=None, ge=0.0, le=10.0)
+    music_construction: float | None = Field(default=None, ge=0.0, le=10.0)
+    body_control: float | None = Field(default=None, ge=0.0, le=10.0)
+    showmanship: float | None = Field(default=None, ge=0.0, le=10.0)
+    notes: str = Field(default="", max_length=4096)
+
+
+class ScoreBreakdownRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    technical_raw: float
+    technical_scaled: float
+    freestyle_evaluation_raw: float
+    freestyle_evaluation_scaled: float
+    major_deductions: float
+    final_score: float
+    confidence: float
+    ruleset_version: str
+    warnings: list[str]
+
+
+class TokenResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+
+
+class LoginRequest(BaseModel):
+    email: str
+    password: str
