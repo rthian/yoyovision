@@ -26,7 +26,9 @@ export function LiveScoreStrip({
           <p className="text-xs font-semibold uppercase tracking-wide text-content-dim">
             Live at {formatMsAsTimecode(preview.up_to_ms)}
           </p>
-          <p className="text-3xl font-bold text-brand-boldest">{preview.final_score.toFixed(1)}</p>
+          <p className="text-3xl font-bold tabular-nums text-brand-boldest">
+            {preview.final_score.toFixed(1)}
+          </p>
           <p className="text-xs text-content-dim">
             {preview.completed_event_count} trick
             {preview.completed_event_count === 1 ? "" : "s"} credited so far

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef } from "react";
 
 import type { AnalysisEvent } from "@/lib/types";
 
@@ -17,9 +17,6 @@ function activeEventAt(events: AnalysisEvent[], timeMs: number): AnalysisEvent |
   );
 }
 
-/** Picks the evidence ref within `event.evidence_json.evidence` whose
- * `frame_ms` is closest to `timeMs`, per product principle #2 ("Every
- * detected event must include timestamps, confidence, evidence"). */
 function closestEvidence(event: AnalysisEvent, timeMs: number): EvidenceRef | null {
   const evidence = event.evidence_json.evidence;
   if (!Array.isArray(evidence) || evidence.length === 0) {
@@ -42,30 +39,43 @@ interface VideoPlayerWithOverlayProps {
   events: AnalysisEvent[];
   onTimeUpdateMs?: (ms: number) => void;
   seekToMs?: number | null;
+  routineStartMs?: number;
+  routineEndMs?: number;
 }
 
-/** HTML5 video with a canvas overlay (per the recommended Frontend stack:
- * "HTML5 video" + "Canvas or SVG overlays") drawing the evidence bounding
- * box for whichever event is active at the current playhead position. */
 export function VideoPlayerWithOverlay({
   src,
   events,
   onTimeUpdateMs,
   seekToMs,
+  routineStartMs = 0,
+  routineEndMs,
 }: VideoPlayerWithOverlayProps): JSX.Element {
-  const videoRef = useRef<HTMLVideoElement>(null);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const [currentMs, setCurrentMs] = useState(0);
+  const currentMsRef = useRef(0);
+  const onTimeUpdateRef = useRef(onTimeUpdateMs);
+  const eventsRef = useRef(events);
+  const detachVideoListenersRef = useRef<(() => void) | null>(null);
+  const routineStartRef = useRef(routineStartMs);
+  const routineEndRef = useRef(routineEndMs ?? Number.MAX_SAFE_INTEGER);
 
   useEffect(() => {
-    if (seekToMs == null || !videoRef.current) {
-      return;
-    }
-    videoRef.current.currentTime = seekToMs / 1000;
-  }, [seekToMs]);
+    routineStartRef.current = routineStartMs;
+    routineEndRef.current = routineEndMs ?? Number.MAX_SAFE_INTEGER;
+  }, [routineStartMs, routineEndMs]);
 
   useEffect(() => {
+    onTimeUpdateRef.current = onTimeUpdateMs;
+  }, [onTimeUpdateMs]);
+
+  useEffect(() => {
+    eventsRef.current = events;
+    drawOverlay(currentMsRef.current);
+  }, [events]);
+
+  function drawOverlay(timeMs: number): void {
     const canvas = canvasRef.current;
     const container = containerRef.current;
     if (!canvas || !container) {
@@ -81,11 +91,11 @@ export function VideoPlayerWithOverlay({
     }
     ctx.clearRect(0, 0, width, height);
 
-    const active = activeEventAt(events, currentMs);
+    const active = activeEventAt(eventsRef.current, timeMs);
     if (!active) {
       return;
     }
-    const evidence = closestEvidence(active, currentMs);
+    const evidence = closestEvidence(active, timeMs);
     if (!evidence?.bbox) {
       return;
     }
@@ -101,16 +111,100 @@ export function VideoPlayerWithOverlay({
     ctx.fillRect(x * width, Math.max(0, y * height - 18), textWidth + 8, 18);
     ctx.fillStyle = "#ffffff";
     ctx.fillText(label, x * width + 4, Math.max(12, y * height - 4));
-  }, [events, currentMs]);
+  }
 
-  function handleTimeUpdate(): void {
-    const video = videoRef.current;
+  function publishTime(ms: number, video?: HTMLVideoElement | null): void {
+    let nextMs = ms;
+    const activeVideo = video ?? videoRef.current;
+    const routineEnd = routineEndRef.current;
+    if (nextMs < routineStartRef.current) {
+      nextMs = routineStartRef.current;
+      if (activeVideo && activeVideo.currentTime * 1000 < routineStartRef.current) {
+        activeVideo.currentTime = routineStartRef.current / 1000;
+      }
+    }
+    if (routineEnd < Number.MAX_SAFE_INTEGER && nextMs > routineEnd) {
+      nextMs = routineEnd;
+      if (activeVideo && !activeVideo.paused) {
+        activeVideo.pause();
+        activeVideo.currentTime = routineEnd / 1000;
+      }
+    }
+    currentMsRef.current = nextMs;
+    onTimeUpdateRef.current?.(nextMs);
+    drawOverlay(nextMs);
+  }
+
+  const attachVideoListeners = useCallback((video: HTMLVideoElement | null): void => {
+    detachVideoListenersRef.current?.();
+    detachVideoListenersRef.current = null;
+    videoRef.current = video;
+
     if (!video) {
       return;
     }
-    const ms = Math.round(video.currentTime * 1000);
-    setCurrentMs(ms);
-    onTimeUpdateMs?.(ms);
+
+    let frameId = 0;
+    const syncWhilePlaying = (): void => {
+      publishTime(Math.round(video.currentTime * 1000), video);
+      if (!video.paused && !video.ended) {
+        frameId = window.requestAnimationFrame(syncWhilePlaying);
+      }
+    };
+
+    const onPlay = (): void => {
+      if (video.currentTime * 1000 < routineStartRef.current) {
+        video.currentTime = routineStartRef.current / 1000;
+      }
+      window.cancelAnimationFrame(frameId);
+      frameId = window.requestAnimationFrame(syncWhilePlaying);
+    };
+
+    const onTimeChanged = (): void => {
+      window.cancelAnimationFrame(frameId);
+      publishTime(Math.round(video.currentTime * 1000), video);
+    };
+
+    video.addEventListener("play", onPlay);
+    video.addEventListener("playing", onPlay);
+    video.addEventListener("pause", onTimeChanged);
+    video.addEventListener("ended", onTimeChanged);
+    video.addEventListener("seeked", onTimeChanged);
+    video.addEventListener("timeupdate", onTimeChanged);
+
+    if (!video.paused && !video.ended) {
+      onPlay();
+    } else {
+      publishTime(Math.round(video.currentTime * 1000));
+    }
+
+    detachVideoListenersRef.current = () => {
+      window.cancelAnimationFrame(frameId);
+      video.removeEventListener("play", onPlay);
+      video.removeEventListener("playing", onPlay);
+      video.removeEventListener("pause", onTimeChanged);
+      video.removeEventListener("ended", onTimeChanged);
+      video.removeEventListener("seeked", onTimeChanged);
+      video.removeEventListener("timeupdate", onTimeChanged);
+    };
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      detachVideoListenersRef.current?.();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (seekToMs == null || !videoRef.current) {
+      return;
+    }
+    videoRef.current.currentTime = seekToMs / 1000;
+    publishTime(seekToMs);
+  }, [seekToMs]);
+
+  function handleTimeUpdate(event: React.SyntheticEvent<HTMLVideoElement>): void {
+    publishTime(Math.round(event.currentTarget.currentTime * 1000));
   }
 
   if (!src) {
@@ -124,7 +218,7 @@ export function VideoPlayerWithOverlay({
   return (
     <div ref={containerRef} className="relative aspect-video overflow-hidden rounded-m bg-black">
       <video
-        ref={videoRef}
+        ref={attachVideoListeners}
         src={src}
         controls
         className="h-full w-full"

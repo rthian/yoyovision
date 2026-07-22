@@ -82,6 +82,19 @@ def test_mock_pose_estimator_is_deterministic() -> None:
     assert [f.keypoints for f in first.frames] == [f.keypoints for f in second.frames]
 
 
+def test_mock_pose_estimator_uses_probed_video_duration(monkeypatch: pytest.MonkeyPatch) -> None:
+    from yoyovision_ml import adapters_mock
+
+    path = Path("/tmp/long-routine.mp4")
+    monkeypatch.setattr(
+        adapters_mock,
+        "_mock_video_timeline",
+        lambda _video_path: (30.0, 221_860),
+    )
+    sequence = MockPoseEstimator().predict(path)
+    assert sequence.frames[-1].frame_ms >= 221_000
+
+
 def test_mock_yoyo_detector_is_deterministic_and_labelled() -> None:
     detector = MockYoyoDetector()
     frames = [FrameRef(frame_ms=0, array=None), FrameRef(frame_ms=33, array=None)]

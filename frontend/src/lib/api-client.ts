@@ -237,6 +237,24 @@ export function cancelAnalysis(analysisId: string): Promise<AnalysisJob> {
   return request<AnalysisJob>(`/analyses/${analysisId}/cancel`, { method: "POST" });
 }
 
+export function updateRoutineWindow(
+  analysisId: string,
+  payload: { routine_start_ms?: number | null; routine_end_ms?: number | null }
+): Promise<AnalysisJob> {
+  return request<AnalysisJob>(`/analyses/${analysisId}/routine-window`, {
+    method: "PATCH",
+    jsonBody: payload,
+  });
+}
+
+export function submitAnalysis(analysisId: string): Promise<AnalysisJob> {
+  return request<AnalysisJob>(`/analyses/${analysisId}/submit`, { method: "POST" });
+}
+
+export function reopenAnalysis(analysisId: string): Promise<AnalysisJob> {
+  return request<AnalysisJob>(`/analyses/${analysisId}/reopen`, { method: "POST" });
+}
+
 // --------------------------------------------------------------------------- //
 // Events
 // --------------------------------------------------------------------------- //
@@ -366,6 +384,12 @@ export async function exportDeductionsCsv(
   analysisId: string
 ): Promise<{ blob: Blob; filename: string | null }> {
   return requestBlob(`/analyses/${analysisId}/export/deductions.csv`);
+}
+
+export async function exportDatasetRecord(
+  analysisId: string
+): Promise<{ blob: Blob; filename: string | null }> {
+  return requestBlob(`/analyses/${analysisId}/export/dataset-record.json`);
 }
 
 // --------------------------------------------------------------------------- //

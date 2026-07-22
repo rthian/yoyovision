@@ -92,8 +92,12 @@ class PerceptionPipeline:
         )
 
     def run(self, video_path: Path, duration_ms: int, fps: float) -> PerceptionResult:
-        pose_sequence = self._pose_estimator.predict(video_path)
-        hand_sequence = self._hand_estimator.predict(video_path)
+        pose_sequence = self._pose_estimator.predict(
+            video_path, duration_ms=duration_ms, fps=fps
+        )
+        hand_sequence = self._hand_estimator.predict(
+            video_path, duration_ms=duration_ms, fps=fps
+        )
 
         frames = extract_frames(
             video_path, duration_ms=duration_ms, fps=fps, sample_fps=self.sample_fps

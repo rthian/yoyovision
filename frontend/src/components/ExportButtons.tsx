@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-import { exportDeductionsCsv, exportEventsCsv, exportReportJson } from "@/lib/api-client";
+import { exportDeductionsCsv, exportDatasetRecord, exportEventsCsv, exportReportJson } from "@/lib/api-client";
 
 function triggerDownload(blob: Blob, filename: string): void {
   const url = URL.createObjectURL(blob);
@@ -83,6 +83,20 @@ export function ExportButtons({ analysisId }: ExportButtonsProps): JSX.Element {
         className="rounded-full border border-outline-default px-4 py-2 text-sm font-semibold text-content-default hover:bg-surface-alt disabled:opacity-60"
       >
         {pendingExport === "deductions" ? "Exporting..." : "Export deductions (CSV)"}
+      </button>
+      <button
+        type="button"
+        disabled={pendingExport !== null}
+        onClick={() =>
+          handleExport(
+            "dataset",
+            () => exportDatasetRecord(analysisId),
+            `yoyovision-dataset-record-${analysisId}.json`
+          )
+        }
+        className="rounded-full border border-outline-default px-4 py-2 text-sm font-semibold text-content-default hover:bg-surface-alt disabled:opacity-60"
+      >
+        {pendingExport === "dataset" ? "Exporting..." : "Export dataset record (JSON)"}
       </button>
     </div>
   );

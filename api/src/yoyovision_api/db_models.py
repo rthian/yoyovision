@@ -14,6 +14,7 @@ from sqlalchemy import JSON, Boolean, DateTime, Float, ForeignKey, Integer, Stri
 from sqlalchemy import Enum as SAEnum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from yoyovision_ml.domain import (
+    AnalysisReviewState,
     DeductionType,
     DifficultyBand,
     EventFamily,
@@ -129,6 +130,19 @@ class AnalysisJobORM(Base):
     #: Incremented by the worker each time a `TransientPipelineError` causes
     #: a Celery retry -- never incremented for deterministic failures.
     retry_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    #: Judged routine window inside the uploaded clip. When set, scoring and the
+    #: review UI treat only this span as the competitive routine.
+    routine_start_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    routine_end_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    review_state: Mapped[AnalysisReviewState] = mapped_column(
+        _str_enum(AnalysisReviewState, 16),
+        nullable=False,
+        default=AnalysisReviewState.DRAFT,
+    )
+    submitted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    submitted_by: Mapped[str | None] = mapped_column(
+        String(36), ForeignKey("users.id"), nullable=True
+    )
 
     video: Mapped[VideoAssetORM] = relationship(back_populates="jobs")
     events: Mapped[list[AnalysisEventORM]] = relationship(

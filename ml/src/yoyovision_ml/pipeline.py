@@ -230,7 +230,7 @@ def run_analysis_pipeline(
             device_info.resolved,
             model_registry,
         )
-        pose_sequence = pose_estimator.predict(video_path)
+        pose_sequence = pose_estimator.predict(video_path, duration_ms=duration_ms, fps=fps)
     _finish(PipelineStage.POSE_EXTRACTION)
 
     _stage(PipelineStage.HAND_EXTRACTION)
@@ -243,7 +243,7 @@ def run_analysis_pipeline(
             device_info.resolved,
             model_registry,
         )
-        hand_sequence = hand_estimator.predict(video_path)
+        hand_sequence = hand_estimator.predict(video_path, duration_ms=duration_ms, fps=fps)
     _finish(PipelineStage.HAND_EXTRACTION)
 
     _stage(PipelineStage.YOYO_DETECTION)

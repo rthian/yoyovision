@@ -18,7 +18,8 @@ from yoyovision_api.db_models import (
     ScoreBreakdownORM,
     VideoAssetORM,
 )
-from yoyovision_api.deps import DbSession, OwnedJob, SettingsDep
+from yoyovision_api.deps import CurrentUser, DbSession, OwnedJob, SettingsDep, StorageDep
+from yoyovision_api.services.dataset_export_service import build_dataset_record
 from yoyovision_api.services.domain_mapping import (
     deduction_to_domain,
     event_to_domain,
@@ -91,5 +92,30 @@ async def export_deductions(job: OwnedJob, session: DbSession) -> Response:
     return Response(
         content=payload,
         media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@router.get("/dataset-record.json")
+async def export_dataset_record(
+    job: OwnedJob,
+    session: DbSession,
+    current_user: CurrentUser,
+    storage: StorageDep,
+) -> Response:
+    """Exports the reviewed analysis as a versioned `DatasetRecord` for training."""
+    video = await _load_video(job, session)
+    try:
+        record = await build_dataset_record(session, job, video, current_user, storage)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(exc),
+        ) from exc
+
+    filename = sanitize_export_filename(f"yoyovision-dataset-record-{job.id}", "json")
+    return Response(
+        content=record.model_dump_json(indent=2),
+        media_type="application/json",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )

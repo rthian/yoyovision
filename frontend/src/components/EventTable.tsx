@@ -37,6 +37,7 @@ interface EventTableProps {
   currentMs: number;
   activeEventId: string | null;
   onSeek: (ms: number) => void;
+  readOnly?: boolean;
 }
 
 /** Full add/edit/delete/confirm/reject editor for `AnalysisEvent` rows, per
@@ -50,6 +51,7 @@ export function EventTable({
   currentMs,
   activeEventId,
   onSeek,
+  readOnly = false,
 }: EventTableProps): JSX.Element {
   const updateEvent = useUpdateEvent(analysisId);
   const confirmEvent = useConfirmEvent(analysisId);
@@ -121,6 +123,7 @@ export function EventTable({
                 <td className="px-3 py-2">
                   <input
                     defaultValue={event.label}
+                    disabled={readOnly}
                     onBlur={(e) => {
                       if (e.target.value !== event.label) {
                         updateEvent.mutate({
@@ -135,6 +138,7 @@ export function EventTable({
                 <td className="px-3 py-2">
                   <select
                     value={event.family}
+                    disabled={readOnly}
                     onChange={(e) =>
                       updateEvent.mutate({
                         eventId: event.id,
@@ -153,6 +157,7 @@ export function EventTable({
                 <td className="px-3 py-2">
                   <select
                     value={event.outcome}
+                    disabled={readOnly}
                     onChange={(e) =>
                       updateEvent.mutate({
                         eventId: event.id,
@@ -171,6 +176,7 @@ export function EventTable({
                 <td className="px-3 py-2">
                   <select
                     value={event.difficulty_band}
+                    disabled={readOnly}
                     onChange={(e) =>
                       updateEvent.mutate({
                         eventId: event.id,
@@ -191,8 +197,17 @@ export function EventTable({
                   {(() => {
                     const lineItem = lineItemsByEventId.get(event.id);
                     const familyBadge = nonScoringFamilyBadge(event.family);
+                    const isCompleted = event.end_ms <= currentMs;
                     if (!lineItem) {
                       return <span className="text-content-dim">—</span>;
+                    }
+                    if (!isCompleted) {
+                      return (
+                        <div className="flex flex-col gap-0.5">
+                          <span className="text-content-dim">—</span>
+                          <span className="text-xs text-content-dim">Pending</span>
+                        </div>
+                      );
                     }
                     return (
                       <div className="flex flex-col gap-0.5">
@@ -226,6 +241,9 @@ export function EventTable({
                   </span>
                 </td>
                 <td className="px-3 py-2">
+                  {readOnly ? (
+                    <span className="text-content-dim">—</span>
+                  ) : (
                   <div className="flex gap-2">
                     <button
                       type="button"
@@ -256,6 +274,7 @@ export function EventTable({
                       Delete
                     </button>
                   </div>
+                  )}
                 </td>
               </tr>
             );
@@ -271,7 +290,7 @@ export function EventTable({
         </table>
       </div>
 
-      {isAdding ? (
+      {readOnly ? null : isAdding ? (
         <form
           onSubmit={(e) => {
             e.preventDefault();

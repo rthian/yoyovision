@@ -2,7 +2,15 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { getAnalysis, getScore, getScoreLineItems, recomputeScore } from "@/lib/api-client";
+import {
+  getAnalysis,
+  getScore,
+  getScoreLineItems,
+  reopenAnalysis,
+  recomputeScore,
+  submitAnalysis,
+  updateRoutineWindow,
+} from "@/lib/api-client";
 
 export const analysisQueryKey = (analysisId: string) => ["analyses", analysisId] as const;
 export const scoreQueryKey = (analysisId: string) =>
@@ -45,6 +53,39 @@ export function useRecomputeScore(analysisId: string) {
     onSuccess: (score) => {
       queryClient.setQueryData(scoreQueryKey(analysisId), score);
       void queryClient.invalidateQueries({ queryKey: scoreLineItemsQueryKey(analysisId) });
+    },
+  });
+}
+
+export function useUpdateRoutineWindow(analysisId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: { routine_start_ms?: number | null; routine_end_ms?: number | null }) =>
+      updateRoutineWindow(analysisId, payload),
+    onSuccess: (job) => {
+      queryClient.setQueryData(analysisQueryKey(analysisId), job);
+      void queryClient.invalidateQueries({ queryKey: scoreQueryKey(analysisId) });
+      void queryClient.invalidateQueries({ queryKey: scoreLineItemsQueryKey(analysisId) });
+    },
+  });
+}
+
+export function useSubmitAnalysis(analysisId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => submitAnalysis(analysisId),
+    onSuccess: (job) => {
+      queryClient.setQueryData(analysisQueryKey(analysisId), job);
+    },
+  });
+}
+
+export function useReopenAnalysis(analysisId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => reopenAnalysis(analysisId),
+    onSuccess: (job) => {
+      queryClient.setQueryData(analysisQueryKey(analysisId), job);
     },
   });
 }

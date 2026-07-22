@@ -19,6 +19,8 @@ export type JobStatus =
   | "failed"
   | "cancelled";
 
+export type AnalysisReviewState = "draft" | "submitted";
+
 export type PipelineStage =
   | "queued"
   | "media_validation"
@@ -153,6 +155,10 @@ export interface AnalysisJob {
   is_shadow: boolean;
   cancel_requested: boolean;
   retry_count: number;
+  routine_start_ms: number | null;
+  routine_end_ms: number | null;
+  review_state: AnalysisReviewState;
+  submitted_at: string | null;
 }
 
 export interface AnalysisEvent {

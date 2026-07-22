@@ -14,6 +14,8 @@ interface EventTimelineProps {
   durationMs: number;
   currentMs: number;
   onSeek: (ms: number) => void;
+  routineStartMs?: number;
+  routineEndMs?: number;
 }
 
 /** A clickable timeline strip: each event renders as a colored segment
@@ -24,8 +26,13 @@ export function EventTimeline({
   durationMs,
   currentMs,
   onSeek,
+  routineStartMs = 0,
+  routineEndMs,
 }: EventTimelineProps): JSX.Element {
   const safeDuration = durationMs > 0 ? durationMs : 1;
+  const routineEnd = routineEndMs ?? durationMs;
+  const startPct = (routineStartMs / safeDuration) * 100;
+  const endPct = (routineEnd / safeDuration) * 100;
 
   return (
     <div className="flex flex-col gap-2">
@@ -43,6 +50,28 @@ export function EventTimeline({
           onSeek(Math.round(ratio * safeDuration));
         }}
       >
+        {routineStartMs > 0 ? (
+          <div
+            className="pointer-events-none absolute inset-y-0 left-0 bg-content-default/10"
+            style={{ width: `${startPct}%` }}
+          />
+        ) : null}
+        {routineEnd < durationMs ? (
+          <div
+            className="pointer-events-none absolute inset-y-0 right-0 bg-content-default/10"
+            style={{ width: `${100 - endPct}%` }}
+          />
+        ) : null}
+        <div
+          className="pointer-events-none absolute inset-y-1 border-l-2 border-brand-primary-bold"
+          style={{ left: `${startPct}%` }}
+          title="Measure start"
+        />
+        <div
+          className="pointer-events-none absolute inset-y-1 border-r-2 border-brand-primary-bold"
+          style={{ left: `${endPct}%` }}
+          title="Music stop"
+        />
         {events.map((eventItem) => {
           const left = (eventItem.start_ms / safeDuration) * 100;
           const width = Math.max(

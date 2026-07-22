@@ -59,6 +59,9 @@ function majorDeductionsUpTo(
   for (const deduction of sorted) {
     const rule = deductionRuleFor(ruleset, deduction.type);
     if (!rule) {
+      if (deduction.review_status !== "rejected") {
+        total += deduction.points;
+      }
       continue;
     }
 
@@ -96,10 +99,16 @@ export function computeLiveScorePreview(
   deductions: MajorDeduction[],
   score: ScoreBreakdown,
   ruleset: Ruleset,
-  currentMs: number
+  currentMs: number,
+  routineWindow?: { startMs: number; endMs: number }
 ): LiveScorePreview {
+  const window = routineWindow ?? { startMs: 0, endMs: Number.POSITIVE_INFINITY };
   const completedEvents = events.filter(
-    (event) => event.review_status !== "rejected" && event.end_ms <= currentMs
+    (event) =>
+      event.review_status !== "rejected" &&
+      event.end_ms <= currentMs &&
+      event.start_ms >= window.startMs &&
+      event.end_ms <= window.endMs
   );
   let technicalRaw = 0;
   for (const event of completedEvents) {
@@ -107,7 +116,14 @@ export function computeLiveScorePreview(
   }
   technicalRaw = round3(technicalRaw);
   const technicalScaled = round3(Math.min(technicalRaw, ruleset.technical_scale_max));
-  const majorDeductions = majorDeductionsUpTo(deductions, ruleset, currentMs);
+  const majorDeductions = majorDeductionsUpTo(
+    deductions.filter(
+      (deduction) =>
+        deduction.timestamp_ms >= window.startMs && deduction.timestamp_ms <= window.endMs
+    ),
+    ruleset,
+    currentMs
+  );
   const finalScore = round3(
     Math.max(
       0,
@@ -121,7 +137,9 @@ export function computeLiveScorePreview(
       (event) =>
         event.review_status !== "rejected" &&
         currentMs >= event.start_ms &&
-        currentMs <= event.end_ms
+        currentMs <= event.end_ms &&
+        event.start_ms >= window.startMs &&
+        event.end_ms <= window.endMs
     ) ?? null;
 
   return {

@@ -10,6 +10,7 @@ from yoyovision_ml.domain import ReviewStatus, Source
 from yoyovision_api.db_models import MajorDeductionORM
 from yoyovision_api.deps import DbSession, OwnedJob, SettingsDep
 from yoyovision_api.schemas import MajorDeductionCreate, MajorDeductionRead, MajorDeductionUpdate
+from yoyovision_api.services.review_guard import ensure_analysis_editable
 from yoyovision_api.services.scoring_service import recompute_score
 
 router = APIRouter(prefix="/analyses/{analysis_id}/deductions", tags=["deductions"])
@@ -46,6 +47,7 @@ async def create_deduction(
     session: DbSession,
     settings: SettingsDep,
 ) -> MajorDeductionORM:
+    ensure_analysis_editable(job)
     deduction = MajorDeductionORM(
         analysis_id=job.id,
         type=payload.type,
@@ -71,6 +73,7 @@ async def update_deduction(
     session: DbSession,
     settings: SettingsDep,
 ) -> MajorDeductionORM:
+    ensure_analysis_editable(job)
     deduction = await _get_owned_deduction(job, deduction_id, session)
 
     changes = payload.model_dump(exclude_unset=True, exclude={"review_status"})
@@ -92,6 +95,7 @@ async def update_deduction(
 async def confirm_deduction(
     job: OwnedJob, deduction_id: str, session: DbSession
 ) -> MajorDeductionORM:
+    ensure_analysis_editable(job)
     deduction = await _get_owned_deduction(job, deduction_id, session)
     deduction.review_status = ReviewStatus.CONFIRMED
     await session.commit()
@@ -102,6 +106,7 @@ async def confirm_deduction(
 async def reject_deduction(
     job: OwnedJob, deduction_id: str, session: DbSession, settings: SettingsDep
 ) -> MajorDeductionORM:
+    ensure_analysis_editable(job)
     deduction = await _get_owned_deduction(job, deduction_id, session)
     deduction.review_status = ReviewStatus.REJECTED
     await session.flush()
@@ -114,6 +119,7 @@ async def reject_deduction(
 async def delete_deduction(
     job: OwnedJob, deduction_id: str, session: DbSession, settings: SettingsDep
 ) -> Response:
+    ensure_analysis_editable(job)
     deduction = await _get_owned_deduction(job, deduction_id, session)
     await session.delete(deduction)
     await session.flush()

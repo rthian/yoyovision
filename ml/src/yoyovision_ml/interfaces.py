@@ -47,7 +47,13 @@ class PoseEstimator(Protocol):
     model_name: str
     model_version: str
 
-    def predict(self, video_path: Path) -> PoseSequence: ...
+    def predict(
+        self,
+        video_path: Path,
+        *,
+        duration_ms: int | None = None,
+        fps: float | None = None,
+    ) -> PoseSequence: ...
 
 
 @runtime_checkable
@@ -57,7 +63,13 @@ class HandEstimator(Protocol):
     model_name: str
     model_version: str
 
-    def predict(self, video_path: Path) -> HandSequence: ...
+    def predict(
+        self,
+        video_path: Path,
+        *,
+        duration_ms: int | None = None,
+        fps: float | None = None,
+    ) -> HandSequence: ...
 
 
 @runtime_checkable

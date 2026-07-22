@@ -105,6 +105,33 @@ def _deterministic_unit_floats(seed: int, count: int) -> list[float]:
     return values
 
 
+def _mock_video_timeline(
+    video_path: Path,
+    *,
+    duration_ms: int | None = None,
+    fps: float | None = None,
+) -> tuple[float, int]:
+    """Resolve fps and duration for mock pose/hand timelines.
+
+    Mock adapters must span the uploaded clip, not a fixed 20s stub, so
+    temporal event detection and scoring can cover the full routine.
+    """
+    if duration_ms is not None and duration_ms > 0 and fps is not None and fps > 0:
+        return fps, duration_ms
+
+    try:
+        from yoyovision_ml.media_validation import probe_video_metadata
+
+        metadata = probe_video_metadata(video_path)
+        resolved_fps = metadata.fps if metadata.fps > 0 else _MOCK_FPS_DEFAULT
+        resolved_duration_ms = (
+            metadata.duration_ms if metadata.duration_ms > 0 else _MOCK_DURATION_MS_DEFAULT
+        )
+        return resolved_fps, resolved_duration_ms
+    except Exception:
+        return _MOCK_FPS_DEFAULT, _MOCK_DURATION_MS_DEFAULT
+
+
 @register_pose_estimator("mock")
 class MockPoseEstimator:
     """Deterministic mock body-pose estimator. NOT a trained model."""
@@ -112,13 +139,21 @@ class MockPoseEstimator:
     model_name = "mock-pose-estimator"
     model_version = "0.0.0-mock"
 
-    def predict(self, video_path: Path) -> PoseSequence:
+    def predict(
+        self,
+        video_path: Path,
+        *,
+        duration_ms: int | None = None,
+        fps: float | None = None,
+    ) -> PoseSequence:
         seed = _stable_seed("pose", str(video_path))
-        fps = _MOCK_FPS_DEFAULT
-        n_frames = int(_MOCK_DURATION_MS_DEFAULT / 1000 * fps)
+        resolved_fps, resolved_duration_ms = _mock_video_timeline(
+            video_path, duration_ms=duration_ms, fps=fps
+        )
+        n_frames = max(1, int(resolved_duration_ms / 1000 * resolved_fps))
         frames = []
         for frame_idx in range(n_frames):
-            frame_ms = int(frame_idx / fps * 1000)
+            frame_ms = int(frame_idx / resolved_fps * 1000)
             jitter = _deterministic_unit_floats(seed + frame_idx, len(_POSE_LANDMARK_NAMES))
             keypoints = tuple(
                 Keypoint(name=name, x=j, y=1.0 - j, z=0.0, visibility=0.9)
@@ -129,7 +164,7 @@ class MockPoseEstimator:
             frames=tuple(frames),
             model_name=self.model_name,
             model_version=self.model_version,
-            fps=fps,
+            fps=resolved_fps,
         )
 
 
@@ -140,13 +175,21 @@ class MockHandEstimator:
     model_name = "mock-hand-estimator"
     model_version = "0.0.0-mock"
 
-    def predict(self, video_path: Path) -> HandSequence:
+    def predict(
+        self,
+        video_path: Path,
+        *,
+        duration_ms: int | None = None,
+        fps: float | None = None,
+    ) -> HandSequence:
         seed = _stable_seed("hands", str(video_path))
-        fps = _MOCK_FPS_DEFAULT
-        n_frames = int(_MOCK_DURATION_MS_DEFAULT / 1000 * fps)
+        resolved_fps, resolved_duration_ms = _mock_video_timeline(
+            video_path, duration_ms=duration_ms, fps=fps
+        )
+        n_frames = max(1, int(resolved_duration_ms / 1000 * resolved_fps))
         frames = []
         for frame_idx in range(n_frames):
-            frame_ms = int(frame_idx / fps * 1000)
+            frame_ms = int(frame_idx / resolved_fps * 1000)
             for handedness in ("left", "right"):
                 jitter = _deterministic_unit_floats(
                     seed + frame_idx + (1 if handedness == "right" else 0),
@@ -168,7 +211,7 @@ class MockHandEstimator:
             frames=tuple(frames),
             model_name=self.model_name,
             model_version=self.model_version,
-            fps=fps,
+            fps=resolved_fps,
         )
 
 
@@ -261,7 +304,8 @@ class MockTemporalEventDetector:
 
         total_ms = features.frames[-1].frame_ms
         seed = _stable_seed("temporal-events", str(total_ms), str(len(features.frames)))
-        n_events = max(3, min(24, total_ms // 1500))
+        # ~1 event every 2.5s across the full clip, capped to keep review manageable.
+        n_events = max(3, min(total_ms // 2500, 150))
         events: list[AnalysisEventPrediction] = []
 
         for i in range(n_events):
@@ -269,7 +313,10 @@ class MockTemporalEventDetector:
             family = _EVENT_FAMILY_CYCLE[(seed + i) % len(_EVENT_FAMILY_CYCLE)]
             outcome = _OUTCOME_CYCLE[(seed + i) % len(_OUTCOME_CYCLE)]
             band = _BAND_CYCLE[(seed + i) % len(_BAND_CYCLE)]
-            start_ms = int((i / n_events) * total_ms)
+            if n_events == 1:
+                start_ms = 0
+            else:
+                start_ms = int((i / (n_events - 1)) * max(0, total_ms - 800))
             end_ms = min(total_ms, start_ms + 400 + int(jitter[0] * 600))
             confidence = round(0.4 + jitter[1] * 0.55, 3)
 

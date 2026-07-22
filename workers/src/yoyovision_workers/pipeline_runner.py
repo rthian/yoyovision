@@ -61,6 +61,7 @@ from yoyovision_ml.inference.model_registry import get_model_registry
 from yoyovision_ml.inference.report import generate_human_readable_report
 from yoyovision_ml.inference.timing import StageTimings
 from yoyovision_ml.interfaces import StoragePort
+from yoyovision_ml.media_validation import probe_video_metadata
 from yoyovision_ml.pipeline import PipelineResult, StageCallback, run_analysis_pipeline
 from yoyovision_ml.ruleset import Ruleset, default_ruleset, get_ruleset_by_version
 
@@ -257,6 +258,18 @@ async def _run_pipeline_for_job(
 
     ruleset = get_ruleset_by_version(settings.ruleset_version) or default_ruleset()
 
+    probed_duration_ms = video_row["duration_ms"] or 0
+    probed_fps = video_row["fps"] or _DEFAULT_FPS_IF_UNKNOWN
+    if tmp_path is not None:
+        try:
+            metadata = probe_video_metadata(tmp_path)
+            if metadata.duration_ms > 0:
+                probed_duration_ms = metadata.duration_ms
+            if metadata.fps > 0:
+                probed_fps = metadata.fps
+        except Exception as exc:  # noqa: BLE001 - fall back to stored metadata
+            job_logger.warning("duration_reprobe_failed", error=str(exc))
+
     #: Cooperative cancellation across the async/sync boundary: the pipeline
     #: itself is a plain blocking function, so it runs on a worker thread
     #: (`asyncio.to_thread`) while this coroutine keeps polling Postgres and
@@ -277,8 +290,8 @@ async def _run_pipeline_for_job(
         result = await asyncio.to_thread(
             run_analysis_pipeline,
             video_path=tmp_path,
-            duration_ms=video_row["duration_ms"] or 0,
-            fps=video_row["fps"] or _DEFAULT_FPS_IF_UNKNOWN,
+            duration_ms=probed_duration_ms,
+            fps=probed_fps,
             ruleset=ruleset,
             sample_fps=settings.pipeline_sample_fps,
             device_preference=settings.pipeline_device,

@@ -27,6 +27,7 @@ function toFormState(evaluation: FreestyleEvaluation | null): FreestyleEvaluatio
 interface FreestyleEvaluationFormProps {
   analysisId: string;
   evaluation: FreestyleEvaluation | null;
+  readOnly?: boolean;
 }
 
 /** Manual-entry form for the Freestyle Evaluation (MVP scope: "Freestyle
@@ -35,6 +36,7 @@ interface FreestyleEvaluationFormProps {
 export function FreestyleEvaluationForm({
   analysisId,
   evaluation,
+  readOnly = false,
 }: FreestyleEvaluationFormProps): JSX.Element {
   const upsertEvaluation = useUpsertEvaluation(analysisId);
   const [form, setForm] = useState<FreestyleEvaluationUpsert>(() => toFormState(evaluation));
@@ -64,6 +66,7 @@ export function FreestyleEvaluationForm({
               min={0}
               max={10}
               step={0.5}
+              disabled={readOnly}
               value={form[key] ?? ""}
               onChange={(e) =>
                 setForm((prev) => ({
@@ -80,11 +83,13 @@ export function FreestyleEvaluationForm({
         Notes
         <textarea
           value={form.notes ?? ""}
+          disabled={readOnly}
           onChange={(e) => setForm((prev) => ({ ...prev, notes: e.target.value }))}
           maxLength={4096}
           className="h-20 rounded-m border border-outline-default p-2 text-sm"
         />
       </label>
+      {readOnly ? null : (
       <button
         type="button"
         onClick={handleSubmit}
@@ -93,6 +98,7 @@ export function FreestyleEvaluationForm({
       >
         {upsertEvaluation.isPending ? "Saving..." : "Save evaluation"}
       </button>
+      )}
     </div>
   );
 }

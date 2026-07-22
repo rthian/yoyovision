@@ -9,6 +9,7 @@ from yoyovision_ml.domain import Source
 from yoyovision_api.db_models import FreestyleEvaluationORM
 from yoyovision_api.deps import DbSession, OwnedJob, SettingsDep
 from yoyovision_api.schemas import FreestyleEvaluationRead, FreestyleEvaluationUpsert
+from yoyovision_api.services.review_guard import ensure_analysis_editable
 from yoyovision_api.services.scoring_service import recompute_score
 
 router = APIRouter(prefix="/analyses/{analysis_id}/evaluation", tags=["evaluations"])
@@ -29,6 +30,7 @@ async def upsert_evaluation(
     session: DbSession,
     settings: SettingsDep,
 ) -> FreestyleEvaluationORM:
+    ensure_analysis_editable(job)
     result = await session.execute(
         select(FreestyleEvaluationORM).where(FreestyleEvaluationORM.analysis_id == job.id)
     )

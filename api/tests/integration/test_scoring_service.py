@@ -274,3 +274,24 @@ async def test_compute_score_preview_credits_only_completed_tricks(
     assert completed_mid == 1
     assert end_preview.technical_raw == 2.0
     assert completed_end == 2
+
+
+def test_technical_line_item_read_accepts_domain_dataclass() -> None:
+    from yoyovision_api.schemas import TechnicalLineItemRead
+    from yoyovision_ml.domain import TechnicalLineItem
+
+    item = TechnicalLineItem(
+        event_id="event-1",
+        start_ms=0,
+        label="mount_0",
+        family=EventFamily.MOUNT,
+        base_points=1.0,
+        multiplier=1.0,
+        points=1.0,
+        reason="credited",
+    )
+
+    read = TechnicalLineItemRead.model_validate(item)
+
+    assert read.event_id == "event-1"
+    assert read.points == 1.0

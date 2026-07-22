@@ -6,6 +6,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field
 from yoyovision_ml.domain import (
+    AnalysisReviewState,
     DeductionType,
     DifficultyBand,
     EventFamily,
@@ -62,6 +63,17 @@ class AnalysisJobRead(BaseModel):
     is_shadow: bool = False
     cancel_requested: bool = False
     retry_count: int = 0
+    #: Optional judged routine window within the uploaded clip (measure start /
+    #: music stop). Null means "use full video duration".
+    routine_start_ms: int | None = None
+    routine_end_ms: int | None = None
+    review_state: AnalysisReviewState = AnalysisReviewState.DRAFT
+    submitted_at: datetime | None = None
+
+
+class RoutineWindowUpdate(BaseModel):
+    routine_start_ms: int | None = Field(default=None, ge=0)
+    routine_end_ms: int | None = Field(default=None, ge=0)
 
 
 class AnalysisEventRead(BaseModel):
@@ -186,6 +198,8 @@ class ScoreBreakdownRead(BaseModel):
 
 
 class TechnicalLineItemRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     event_id: str | None
     start_ms: int
     label: str

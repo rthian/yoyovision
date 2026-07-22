@@ -24,12 +24,13 @@ const REVIEW_STATUS_STYLES: Record<MajorDeduction["review_status"], string> = {
 interface DeductionTableProps {
   analysisId: string;
   deductions: MajorDeduction[];
+  readOnly?: boolean;
 }
 
 /** Editor for `MajorDeduction` rows (yo-yo stop/change/detach, etc.) --
  * "multiple deductions per routine" and "manual override" per the Scoring
  * Requirements. */
-export function DeductionTable({ analysisId, deductions }: DeductionTableProps): JSX.Element {
+export function DeductionTable({ analysisId, deductions, readOnly = false }: DeductionTableProps): JSX.Element {
   const updateDeduction = useUpdateDeduction(analysisId);
   const confirmDeduction = useConfirmDeduction(analysisId);
   const rejectDeduction = useRejectDeduction(analysisId);
@@ -75,6 +76,7 @@ export function DeductionTable({ analysisId, deductions }: DeductionTableProps):
                   <input
                     type="number"
                     min={1}
+                    disabled={readOnly}
                     defaultValue={deduction.quantity}
                     onBlur={(e) => {
                       const quantity = Number(e.target.value);
@@ -90,6 +92,7 @@ export function DeductionTable({ analysisId, deductions }: DeductionTableProps):
                     type="number"
                     min={0}
                     step={0.5}
+                    disabled={readOnly}
                     defaultValue={deduction.points}
                     onBlur={(e) => {
                       const points = Number(e.target.value);
@@ -108,6 +111,9 @@ export function DeductionTable({ analysisId, deductions }: DeductionTableProps):
                   </span>
                 </td>
                 <td className="px-3 py-2">
+                  {readOnly ? (
+                    <span className="text-content-dim">—</span>
+                  ) : (
                   <div className="flex gap-2">
                     <button
                       type="button"
@@ -135,6 +141,7 @@ export function DeductionTable({ analysisId, deductions }: DeductionTableProps):
                       Delete
                     </button>
                   </div>
+                  )}
                 </td>
               </tr>
             ))}
@@ -149,7 +156,7 @@ export function DeductionTable({ analysisId, deductions }: DeductionTableProps):
         </table>
       </div>
 
-      {isAdding ? (
+      {readOnly ? null : isAdding ? (
         <form
           onSubmit={(e) => {
             e.preventDefault();

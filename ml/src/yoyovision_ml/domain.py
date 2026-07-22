@@ -153,6 +153,13 @@ class ReviewStatus(StrEnum):
     EDITED = "edited"
 
 
+class AnalysisReviewState(StrEnum):
+    """Whether a completed analysis is still editable in the review UI."""
+
+    DRAFT = "draft"
+    SUBMITTED = "submitted"
+
+
 class DeductionType(StrEnum):
     YOYO_STOP = "yoyo_stop"
     YOYO_CHANGE = "yoyo_change"

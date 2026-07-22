@@ -71,7 +71,13 @@ class MediaPipePoseEstimator:
             f"solutions-pose@complexity{model_complexity}+mediapipe{mp.__version__}"
         )
 
-    def predict(self, video_path: Path) -> PoseSequence:
+    def predict(
+        self,
+        video_path: Path,
+        *,
+        duration_ms: int | None = None,
+        fps: float | None = None,
+    ) -> PoseSequence:
         mp, cv2 = _import_mediapipe_and_cv2()
         frames: list[PoseFrame] = []
         fps_seen = 30.0
@@ -118,7 +124,13 @@ class MediaPipeHandEstimator:
         mp, _ = _import_mediapipe_and_cv2()
         self.model_version = f"solutions-hands+mediapipe{mp.__version__}"
 
-    def predict(self, video_path: Path) -> HandSequence:
+    def predict(
+        self,
+        video_path: Path,
+        *,
+        duration_ms: int | None = None,
+        fps: float | None = None,
+    ) -> HandSequence:
         mp, cv2 = _import_mediapipe_and_cv2()
         frames: list[HandFrame] = []
         fps_seen = 30.0

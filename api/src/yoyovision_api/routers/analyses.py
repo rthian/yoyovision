@@ -2,22 +2,28 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException, status
-from yoyovision_ml.domain import JobStatus
+from datetime import UTC, datetime
 
-from yoyovision_api.db_models import AnalysisJobORM, ScoreBreakdownORM
-from yoyovision_api.deps import DbSession, OwnedJob, SettingsDep
+from fastapi import APIRouter, HTTPException, status
+from sqlalchemy import select
+from yoyovision_ml.domain import AnalysisReviewState, JobStatus
+
+from yoyovision_api.db_models import AnalysisJobORM, ScoreBreakdownORM, VideoAssetORM
+from yoyovision_api.deps import CurrentUser, DbSession, OwnedJob, SettingsDep
 from yoyovision_api.schemas import (
     AnalysisJobRead,
+    RoutineWindowUpdate,
     ScoreBreakdownRead,
     ScoreLineItemsRead,
     ScorePreviewRead,
     TechnicalLineItemRead,
 )
+from yoyovision_api.services.review_guard import ensure_analysis_editable, ensure_analysis_submittable
 from yoyovision_api.services.scoring_service import (
     compute_score_line_items,
     compute_score_preview,
     recompute_score,
+    resolve_routine_window,
 )
 
 router = APIRouter(prefix="/analyses", tags=["analyses"])
@@ -114,3 +120,75 @@ async def recompute_analysis_score(
     breakdown = await recompute_score(session, job, settings.ruleset_version)
     await session.commit()
     return breakdown
+
+
+@router.patch("/{analysis_id}/routine-window", response_model=AnalysisJobRead)
+async def update_routine_window(
+    job: OwnedJob,
+    payload: RoutineWindowUpdate,
+    session: DbSession,
+    settings: SettingsDep,
+) -> AnalysisJobORM:
+    """Sets the judged routine span (measure start through music stop) within
+    the uploaded clip. Scoring and live playback respect these bounds."""
+    ensure_analysis_editable(job)
+    video = (
+        await session.execute(select(VideoAssetORM).where(VideoAssetORM.id == job.video_id))
+    ).scalar_one_or_none()
+    if video is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Video not found.")
+
+    duration_ms = video.duration_ms or 0
+    if payload.routine_start_ms is not None:
+        job.routine_start_ms = payload.routine_start_ms
+    if payload.routine_end_ms is not None:
+        job.routine_end_ms = payload.routine_end_ms
+
+    routine_start_ms, routine_end_ms = resolve_routine_window(job, duration_ms)
+    if duration_ms > 0 and routine_end_ms > duration_ms:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="routine_end_ms cannot exceed video duration.",
+        )
+    if routine_start_ms < 0 or routine_end_ms <= routine_start_ms:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="routine_end_ms must be greater than routine_start_ms.",
+        )
+
+    await recompute_score(session, job, settings.ruleset_version)
+    await session.commit()
+    await session.refresh(job)
+    return job
+
+
+@router.post("/{analysis_id}/submit", response_model=AnalysisJobRead)
+async def submit_analysis(
+    job: OwnedJob,
+    session: DbSession,
+    current_user: CurrentUser,
+) -> AnalysisJobORM:
+    """Locks the analysis for editing after review is complete."""
+    ensure_analysis_submittable(job)
+    job.review_state = AnalysisReviewState.SUBMITTED
+    job.submitted_at = datetime.now(UTC)
+    job.submitted_by = current_user.id
+    await session.commit()
+    await session.refresh(job)
+    return job
+
+
+@router.post("/{analysis_id}/reopen", response_model=AnalysisJobRead)
+async def reopen_analysis(job: OwnedJob, session: DbSession) -> AnalysisJobORM:
+    """Returns a submitted analysis to draft so edits can resume."""
+    if job.review_state != AnalysisReviewState.SUBMITTED:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Only submitted analyses can be reopened.",
+        )
+    job.review_state = AnalysisReviewState.DRAFT
+    job.submitted_at = None
+    job.submitted_by = None
+    await session.commit()
+    await session.refresh(job)
+    return job

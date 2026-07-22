@@ -18,6 +18,7 @@ from yoyovision_ml.domain import ReviewStatus, Source
 from yoyovision_api.db_models import AnalysisEventORM
 from yoyovision_api.deps import DbSession, OwnedJob, SettingsDep
 from yoyovision_api.schemas import AnalysisEventCreate, AnalysisEventRead, AnalysisEventUpdate
+from yoyovision_api.services.review_guard import ensure_analysis_editable
 from yoyovision_api.services.scoring_service import recompute_score
 
 router = APIRouter(prefix="/analyses/{analysis_id}/events", tags=["events"])
@@ -52,6 +53,7 @@ async def create_event(
     session: DbSession,
     settings: SettingsDep,
 ) -> AnalysisEventORM:
+    ensure_analysis_editable(job)
     event = AnalysisEventORM(
         analysis_id=job.id,
         label=payload.label,
@@ -82,6 +84,7 @@ async def update_event(
     session: DbSession,
     settings: SettingsDep,
 ) -> AnalysisEventORM:
+    ensure_analysis_editable(job)
     event = await _get_owned_event(job, event_id, session)
 
     changes = payload.model_dump(exclude_unset=True, exclude={"review_status"})
@@ -102,6 +105,7 @@ async def update_event(
 
 @router.post("/{event_id}/confirm", response_model=AnalysisEventRead)
 async def confirm_event(job: OwnedJob, event_id: str, session: DbSession) -> AnalysisEventORM:
+    ensure_analysis_editable(job)
     event = await _get_owned_event(job, event_id, session)
     event.review_status = ReviewStatus.CONFIRMED
     await session.commit()
@@ -112,6 +116,7 @@ async def confirm_event(job: OwnedJob, event_id: str, session: DbSession) -> Ana
 async def reject_event(
     job: OwnedJob, event_id: str, session: DbSession, settings: SettingsDep
 ) -> AnalysisEventORM:
+    ensure_analysis_editable(job)
     event = await _get_owned_event(job, event_id, session)
     event.review_status = ReviewStatus.REJECTED
     await session.flush()
@@ -124,6 +129,7 @@ async def reject_event(
 async def delete_event(
     job: OwnedJob, event_id: str, session: DbSession, settings: SettingsDep
 ) -> Response:
+    ensure_analysis_editable(job)
     event = await _get_owned_event(job, event_id, session)
     await session.delete(event)
     await session.flush()

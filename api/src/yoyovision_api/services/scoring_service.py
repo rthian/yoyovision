@@ -46,7 +46,42 @@ from yoyovision_api.db_models import (
     FreestyleEvaluationORM,
     MajorDeductionORM,
     ScoreBreakdownORM,
+    VideoAssetORM,
 )
+
+
+def resolve_routine_window(
+    job: AnalysisJobORM, video_duration_ms: int
+) -> tuple[int, int]:
+    """Returns the inclusive routine span used for scoring and review playback."""
+    start_ms = job.routine_start_ms if job.routine_start_ms is not None else 0
+    end_ms = (
+        job.routine_end_ms
+        if job.routine_end_ms is not None
+        else (video_duration_ms if video_duration_ms > 0 else 0)
+    )
+    if video_duration_ms > 0:
+        end_ms = min(end_ms, video_duration_ms)
+    if end_ms <= start_ms:
+        end_ms = max(start_ms + 1, video_duration_ms)
+    return start_ms, end_ms
+
+
+def _event_in_routine(event: AnalysisEventORM | AnalysisEventPrediction, start_ms: int, end_ms: int) -> bool:
+    return event.start_ms >= start_ms and event.end_ms <= end_ms
+
+
+def _deduction_in_routine(deduction: MajorDeductionORM | DeductionPrediction, start_ms: int, end_ms: int) -> bool:
+    timestamp_ms = deduction.timestamp_ms
+    return start_ms <= timestamp_ms <= end_ms
+
+
+async def _video_duration_ms(session: AsyncSession, job: AnalysisJobORM) -> int:
+    result = await session.execute(
+        select(VideoAssetORM.duration_ms).where(VideoAssetORM.id == job.video_id)
+    )
+    duration_ms = result.scalar_one_or_none()
+    return duration_ms or 0
 
 
 def _event_to_prediction(event: AnalysisEventORM) -> AnalysisEventPrediction:
@@ -113,20 +148,26 @@ async def recompute_score(
         select(FreestyleEvaluationORM).where(FreestyleEvaluationORM.analysis_id == job.id)
     )
 
-    events = [
-        _event_to_prediction(e)
-        for e in events_result.scalars().all()
-        if e.review_status != ReviewStatus.REJECTED
+    video_duration_ms = await _video_duration_ms(session, job)
+    routine_start_ms, routine_end_ms = resolve_routine_window(job, video_duration_ms)
+
+    event_rows = [
+        row
+        for row in events_result.scalars().all()
+        if row.review_status != ReviewStatus.REJECTED
+        and _event_in_routine(row, routine_start_ms, routine_end_ms)
     ]
     ruleset = resolve_ruleset(ruleset_version)
+    predictions = [_event_to_prediction(row) for row in event_rows]
     deductions = [
         _deduction_to_prediction(d)
         for d in deductions_result.scalars().all()
         if deduction_is_scorable(d.type, d.review_status, ruleset)
+        and _deduction_in_routine(d, routine_start_ms, routine_end_ms)
     ]
     evaluation = _evaluation_to_domain(evaluation_result.scalar_one_or_none())
     breakdown = DeterministicScoringEngine().calculate(
-        events=events, deductions=deductions, freestyle_evaluation=evaluation, ruleset=ruleset
+        events=predictions, deductions=deductions, freestyle_evaluation=evaluation, ruleset=ruleset
     )
 
     existing_result = await session.execute(
@@ -159,8 +200,13 @@ async def compute_score_line_items(
     events_result = await session.execute(
         select(AnalysisEventORM).where(AnalysisEventORM.analysis_id == job.id)
     )
+    video_duration_ms = await _video_duration_ms(session, job)
+    routine_start_ms, routine_end_ms = resolve_routine_window(job, video_duration_ms)
     event_rows = [
-        row for row in events_result.scalars().all() if row.review_status != ReviewStatus.REJECTED
+        row
+        for row in events_result.scalars().all()
+        if row.review_status != ReviewStatus.REJECTED
+        and _event_in_routine(row, routine_start_ms, routine_end_ms)
     ]
     ruleset = resolve_ruleset(ruleset_version)
     predictions = [_event_to_prediction(row) for row in event_rows]
@@ -190,8 +236,14 @@ async def _load_scoring_inputs(
         select(FreestyleEvaluationORM).where(FreestyleEvaluationORM.analysis_id == job.id)
     )
 
+    video_duration_ms = await _video_duration_ms(session, job)
+    routine_start_ms, routine_end_ms = resolve_routine_window(job, video_duration_ms)
+
     event_rows = [
-        row for row in events_result.scalars().all() if row.review_status != ReviewStatus.REJECTED
+        row
+        for row in events_result.scalars().all()
+        if row.review_status != ReviewStatus.REJECTED
+        and _event_in_routine(row, routine_start_ms, routine_end_ms)
     ]
     ruleset = resolve_ruleset(ruleset_version)
     predictions = [_event_to_prediction(row) for row in event_rows]
@@ -199,6 +251,7 @@ async def _load_scoring_inputs(
         _deduction_to_prediction(d)
         for d in deductions_result.scalars().all()
         if deduction_is_scorable(d.type, d.review_status, ruleset)
+        and _deduction_in_routine(d, routine_start_ms, routine_end_ms)
     ]
     evaluation = _evaluation_to_domain(evaluation_result.scalar_one_or_none())
     return event_rows, predictions, deductions, evaluation, ruleset
