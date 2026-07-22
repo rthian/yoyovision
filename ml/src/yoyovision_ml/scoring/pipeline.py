@@ -101,6 +101,7 @@ def _deduction_to_prediction(deduction: MajorDeduction) -> DeductionPrediction:
         confidence=deduction.confidence,
         model_name="human" if deduction.source == Source.HUMAN else "model",
         model_version="n/a",
+        points=deduction.points,
     )
 
 

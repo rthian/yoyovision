@@ -20,6 +20,7 @@ import type {
   MajorDeductionUpdate,
   Ruleset,
   ScoreBreakdown,
+  ScoreLineItems,
   TokenResponse,
   VideoAsset,
 } from "@/lib/types";
@@ -211,6 +212,10 @@ export function getAnalysis(analysisId: string): Promise<AnalysisJob> {
 
 export function getScore(analysisId: string): Promise<ScoreBreakdown> {
   return request<ScoreBreakdown>(`/analyses/${analysisId}/score`);
+}
+
+export function getScoreLineItems(analysisId: string): Promise<ScoreLineItems> {
+  return request<ScoreLineItems>(`/analyses/${analysisId}/score/line-items`);
 }
 
 export function recomputeScore(analysisId: string): Promise<ScoreBreakdown> {

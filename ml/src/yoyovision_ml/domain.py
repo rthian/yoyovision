@@ -301,6 +301,20 @@ class ScoreBreakdown:
     warnings: list[str] = field(default_factory=list)
 
 
+@dataclass(slots=True, frozen=True)
+class TechnicalLineItem:
+    """Per-event technical credit audit row for review UI transparency."""
+
+    event_id: str | None
+    start_ms: int
+    label: str
+    family: EventFamily
+    base_points: float
+    multiplier: float
+    points: float
+    reason: str
+
+
 # --------------------------------------------------------------------------- #
 # Pipeline intermediate types (pose/hands/detections/tracks/features)
 # --------------------------------------------------------------------------- #
@@ -404,3 +418,7 @@ class DeductionPrediction:
     confidence: float
     model_name: str
     model_version: str
+    #: Total points for this row when set (human override or pipeline
+    #: persistence). When `None`, the engine derives points from the
+    #: ruleset's `points_per_occurrence` × `quantity`.
+    points: float | None = None

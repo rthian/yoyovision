@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from "react";
 import { useParams } from "next/navigation";
 import { useState } from "react";
 
@@ -13,7 +14,8 @@ import { RulesetPanel } from "@/components/RulesetPanel";
 import { ScoreBreakdownPanel } from "@/components/ScoreBreakdownPanel";
 import { VideoPlayerWithOverlay } from "@/components/VideoPlayerWithOverlay";
 
-import { useAnalysisJob, useScore } from "@/hooks/useAnalysis";
+import { useAnalysisJob, useScore, useScoreLineItems } from "@/hooks/useAnalysis";
+import type { TechnicalLineItem } from "@/lib/types";
 import { useAuth } from "@/hooks/useAuth";
 import { useDeductions } from "@/hooks/useDeductions";
 import { useEvaluation } from "@/hooks/useEvaluation";
@@ -36,6 +38,7 @@ function AnalysisReview({ analysisId }: { analysisId: string }): JSX.Element {
   const eventsQuery = useEvents(analysisId, isAuthenticated);
   const deductionsQuery = useDeductions(analysisId, isAuthenticated);
   const scoreQuery = useScore(analysisId, isAuthenticated);
+  const lineItemsQuery = useScoreLineItems(analysisId, isAuthenticated);
   const evaluationQuery = useEvaluation(analysisId, isAuthenticated);
   const rulesetQuery = useRuleset(scoreQuery.data?.ruleset_version, isAuthenticated);
 
@@ -58,6 +61,15 @@ function AnalysisReview({ analysisId }: { analysisId: string }): JSX.Element {
   }
 
   const events = eventsQuery.data ?? [];
+  const lineItemsByEventId = useMemo(() => {
+    const map = new Map<string, TechnicalLineItem>();
+    for (const item of lineItemsQuery.data?.technical_line_items ?? []) {
+      if (item.event_id) {
+        map.set(item.event_id, item);
+      }
+    }
+    return map;
+  }, [lineItemsQuery.data]);
 
   function handleSeek(ms: number): void {
     setSeekToMs(ms);
@@ -98,7 +110,12 @@ function AnalysisReview({ analysisId }: { analysisId: string }): JSX.Element {
 
       <section className="flex flex-col gap-3">
         <h2 className="text-lg font-semibold text-content-default">Trick events</h2>
-        <EventTable analysisId={analysisId} events={events} onSeek={handleSeek} />
+        <EventTable
+          analysisId={analysisId}
+          events={events}
+          lineItemsByEventId={lineItemsByEventId}
+          onSeek={handleSeek}
+        />
       </section>
 
       <section className="flex flex-col gap-3">
@@ -114,7 +131,11 @@ function AnalysisReview({ analysisId }: { analysisId: string }): JSX.Element {
       </section>
 
       <section className="flex flex-col gap-3">
-        <ScoreBreakdownPanel analysisId={analysisId} score={scoreQuery.data ?? null} />
+        <ScoreBreakdownPanel
+          analysisId={analysisId}
+          score={scoreQuery.data ?? null}
+          ruleset={rulesetQuery.data ?? null}
+        />
         <RulesetPanel ruleset={rulesetQuery.data ?? null} />
       </section>
     </div>

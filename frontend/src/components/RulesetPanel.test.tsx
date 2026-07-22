@@ -34,6 +34,8 @@ const RULESET: Ruleset = {
   freestyle_evaluation_weights: { execution: 1 },
   technical_scale_max: 60,
   freestyle_evaluation_scale_max: 40,
+  technical_weight: 0.6,
+  freestyle_evaluation_weight: 0.4,
 };
 
 describe("RulesetPanel", () => {

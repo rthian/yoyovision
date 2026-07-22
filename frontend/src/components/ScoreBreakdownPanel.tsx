@@ -1,19 +1,23 @@
 "use client";
 
-import type { ScoreBreakdown } from "@/lib/types";
+import type { Ruleset, ScoreBreakdown } from "@/lib/types";
 
 import { useRecomputeScore } from "@/hooks/useAnalysis";
 
 interface ScoreBreakdownPanelProps {
   analysisId: string;
   score: ScoreBreakdown | null;
+  ruleset: Ruleset | null;
 }
 
 /** Renders the deterministic `ScoreBreakdown` -- always with its
- * `ruleset_version` and any `warnings`, so scoring is never opaque (Core
- * Product Principle #1: "Do not implement an opaque model that directly
- * predicts only a final score"). */
-export function ScoreBreakdownPanel({ analysisId, score }: ScoreBreakdownPanelProps): JSX.Element {
+ * `ruleset_version`, the explicit final-score formula, and any `warnings`,
+ * so scoring is never opaque (Core Product Principle #1). */
+export function ScoreBreakdownPanel({
+  analysisId,
+  score,
+  ruleset,
+}: ScoreBreakdownPanelProps): JSX.Element {
   const recomputeScore = useRecomputeScore(analysisId);
 
   if (!score) {
@@ -23,6 +27,15 @@ export function ScoreBreakdownPanel({ analysisId, score }: ScoreBreakdownPanelPr
       </div>
     );
   }
+
+  const technicalWeight = ruleset?.technical_weight ?? 0.6;
+  const freestyleWeight = ruleset?.freestyle_evaluation_weight ?? 0.4;
+  const technicalContribution = technicalWeight * score.technical_scaled;
+  const freestyleContribution = freestyleWeight * score.freestyle_evaluation_scaled;
+  const computedFinal = Math.max(
+    0,
+    technicalContribution + freestyleContribution - score.major_deductions
+  );
 
   return (
     <div className="flex flex-col gap-4 rounded-m border border-outline-soft bg-surface-default p-4">
@@ -43,6 +56,15 @@ export function ScoreBreakdownPanel({ analysisId, score }: ScoreBreakdownPanelPr
           {score.final_score.toFixed(1)}
         </span>
         <span className="text-sm text-content-dim">final score (unofficial)</span>
+      </div>
+
+      <div className="rounded-s bg-surface-alt p-3 text-sm text-content-default">
+        <p className="font-semibold">How the final score is calculated</p>
+        <p className="mt-1 font-mono text-xs leading-relaxed text-content-subtle">
+          {technicalWeight.toFixed(1)} × {score.technical_scaled.toFixed(2)} (technical) +{" "}
+          {freestyleWeight.toFixed(1)} × {score.freestyle_evaluation_scaled.toFixed(2)} (freestyle)
+          − {score.major_deductions.toFixed(2)} (deductions) = {computedFinal.toFixed(2)}
+        </p>
       </div>
 
       <dl className="grid grid-cols-2 gap-3 text-sm">

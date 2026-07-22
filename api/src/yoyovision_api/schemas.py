@@ -185,6 +185,22 @@ class ScoreBreakdownRead(BaseModel):
     warnings: list[str]
 
 
+class TechnicalLineItemRead(BaseModel):
+    event_id: str | None
+    start_ms: int
+    label: str
+    family: EventFamily
+    base_points: float
+    multiplier: float
+    points: float
+    reason: str
+
+
+class ScoreLineItemsRead(BaseModel):
+    technical_raw: float
+    technical_line_items: list[TechnicalLineItemRead]
+
+
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"

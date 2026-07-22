@@ -3,8 +3,15 @@
 import { useState } from "react";
 
 import { formatConfidence, formatMsAsTimecode, titleCaseFromSnakeCase } from "@/lib/format";
+import { lineItemReasonLabel, nonScoringFamilyBadge } from "@/lib/scoring-labels";
 import { DIFFICULTY_BANDS, EVENT_FAMILIES } from "@/lib/types";
-import type { AnalysisEvent, DifficultyBand, EventFamily, Outcome } from "@/lib/types";
+import type {
+  AnalysisEvent,
+  DifficultyBand,
+  EventFamily,
+  Outcome,
+  TechnicalLineItem,
+} from "@/lib/types";
 
 import {
   useConfirmEvent,
@@ -26,6 +33,7 @@ const REVIEW_STATUS_STYLES: Record<AnalysisEvent["review_status"], string> = {
 interface EventTableProps {
   analysisId: string;
   events: AnalysisEvent[];
+  lineItemsByEventId: Map<string, TechnicalLineItem>;
   onSeek: (ms: number) => void;
 }
 
@@ -33,7 +41,12 @@ interface EventTableProps {
  * Core Product Principle #4 ("Users must be able to add, edit, delete and
  * confirm every detected event"). Every field edit is a full-row PATCH; the
  * API flips `source` to human and `review_status` to `edited` server-side. */
-export function EventTable({ analysisId, events, onSeek }: EventTableProps): JSX.Element {
+export function EventTable({
+  analysisId,
+  events,
+  lineItemsByEventId,
+  onSeek,
+}: EventTableProps): JSX.Element {
   const updateEvent = useUpdateEvent(analysisId);
   const confirmEvent = useConfirmEvent(analysisId);
   const rejectEvent = useRejectEvent(analysisId);
@@ -75,6 +88,7 @@ export function EventTable({ analysisId, events, onSeek }: EventTableProps): JSX
               <th className="px-3 py-2">Outcome</th>
               <th className="px-3 py-2">Difficulty</th>
               <th className="px-3 py-2">Confidence</th>
+              <th className="px-3 py-2">Pts</th>
               <th className="px-3 py-2">Source</th>
               <th className="px-3 py-2">Status</th>
               <th className="px-3 py-2">Actions</th>
@@ -161,6 +175,36 @@ export function EventTable({ analysisId, events, onSeek }: EventTableProps): JSX
                   </select>
                 </td>
                 <td className="px-3 py-2 text-content-dim">{formatConfidence(event.confidence)}</td>
+                <td className="px-3 py-2">
+                  {(() => {
+                    const lineItem = lineItemsByEventId.get(event.id);
+                    const familyBadge = nonScoringFamilyBadge(event.family);
+                    if (!lineItem) {
+                      return <span className="text-content-dim">—</span>;
+                    }
+                    return (
+                      <div className="flex flex-col gap-0.5">
+                        <span
+                          className={
+                            lineItem.points > 0
+                              ? "font-semibold text-content-default"
+                              : "text-content-dim"
+                          }
+                        >
+                          {lineItem.points.toFixed(2)}
+                        </span>
+                        <span className="text-xs text-content-dim">
+                          {lineItemReasonLabel(lineItem.reason)}
+                        </span>
+                        {familyBadge ? (
+                          <span className="text-xs font-semibold text-status-notice">
+                            {familyBadge}
+                          </span>
+                        ) : null}
+                      </div>
+                    );
+                  })()}
+                </td>
                 <td className="px-3 py-2 text-content-dim">{titleCaseFromSnakeCase(event.source)}</td>
                 <td className="px-3 py-2">
                   <span

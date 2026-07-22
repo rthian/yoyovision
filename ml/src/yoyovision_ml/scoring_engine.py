@@ -21,6 +21,7 @@ from yoyovision_ml.domain import (
     Outcome,
     ReviewStatus,
     ScoreBreakdown,
+    TechnicalLineItem,
 )
 from yoyovision_ml.ruleset import Ruleset
 
@@ -34,34 +35,88 @@ def _element_key(event: AnalysisEventPrediction) -> tuple[EventFamily, str]:
     return (event.family, event.label)
 
 
-def _technical_points(
-    events: list[AnalysisEventPrediction], ruleset: Ruleset
-) -> tuple[float, list[str]]:
+def _technical_points_with_line_items(
+    events: list[AnalysisEventPrediction],
+    ruleset: Ruleset,
+    *,
+    event_ids: list[str] | None = None,
+) -> tuple[float, list[str], list[TechnicalLineItem]]:
     """Sum positive credit for successful technical elements, applying the
-    repeated-high-risk-element decay curve. Misses and non-success outcomes
-    never earn positive credit (per product requirement: positive vs
-    negative technical events are handled distinctly)."""
+    repeated-high-risk-element decay curve. Also returns one audit row per
+    input event so the review UI can show per-trick points."""
     warnings: list[str] = []
     occurrence_counts: Counter[tuple[EventFamily, str]] = Counter()
     total = 0.0
+    line_items: list[TechnicalLineItem] = []
 
-    for event in sorted(events, key=lambda e: e.start_ms):
+    sorted_pairs = sorted(
+        (
+            (event_ids[index] if event_ids is not None and index < len(event_ids) else None, event)
+            for index, event in enumerate(events)
+        ),
+        key=lambda pair: pair[1].start_ms,
+    )
+    for event_id, event in sorted_pairs:
         if event.family in MISTAKE_EVENT_FAMILIES:
+            line_items.append(
+                TechnicalLineItem(
+                    event_id=event_id,
+                    start_ms=event.start_ms,
+                    label=event.label,
+                    family=event.family,
+                    base_points=0.0,
+                    multiplier=0.0,
+                    points=0.0,
+                    reason="excluded_mistake",
+                )
+            )
             continue
         if event.family not in POSITIVE_EVENT_FAMILIES:
-            # e.g. unknown_technical_element or equipment families: no positive credit,
-            # but surfaced as a warning so a human reviews classification quality.
+            reason = (
+                "excluded_unknown"
+                if event.family == EventFamily.UNKNOWN_TECHNICAL_ELEMENT
+                else "excluded_equipment"
+            )
             if event.family == EventFamily.UNKNOWN_TECHNICAL_ELEMENT:
                 warnings.append(
                     f"Unclassified technical element at {event.start_ms}ms requires review."
                 )
+            line_items.append(
+                TechnicalLineItem(
+                    event_id=event_id,
+                    start_ms=event.start_ms,
+                    label=event.label,
+                    family=event.family,
+                    base_points=0.0,
+                    multiplier=0.0,
+                    points=0.0,
+                    reason=reason,
+                )
+            )
             continue
         if event.outcome != Outcome.SUCCESS:
+            reason = (
+                "excluded_uncertain"
+                if event.outcome == Outcome.UNCERTAIN
+                else "excluded_outcome_miss"
+            )
             if event.outcome == Outcome.UNCERTAIN:
                 warnings.append(
                     f"Uncertain outcome for '{event.label}' at {event.start_ms}ms "
                     "excluded from technical credit pending review."
                 )
+            line_items.append(
+                TechnicalLineItem(
+                    event_id=event_id,
+                    start_ms=event.start_ms,
+                    label=event.label,
+                    family=event.family,
+                    base_points=0.0,
+                    multiplier=0.0,
+                    points=0.0,
+                    reason=reason,
+                )
+            )
             continue
 
         key = _element_key(event)
@@ -69,12 +124,12 @@ def _technical_points(
         occurrence_index = occurrence_counts[key]
 
         base_points = ruleset.difficulty_band_points.points_for(event.difficulty_band)
-        # Prompt D: "Support repeated-element policies" -- dispatches on
-        # `ruleset.repeated_element_decay.policy` (default policy/behavior
-        # matches pre-Prompt-D: only `high_risk_families` decay).
         decay = ruleset.repeated_element_decay
         multiplier = decay.multiplier_for(event.family, occurrence_index)
+        credited = base_points * multiplier
+        reason = "credited"
         if multiplier < 1.0:
+            reason = f"repeat_occurrence_{occurrence_index}"
             if decay.policy in ("decay_high_risk_only", "cap_occurrences") and (
                 event.family in decay.high_risk_families
             ):
@@ -88,9 +143,42 @@ def _technical_points(
                     f"credited at {multiplier:.0%} under the '{decay.policy}' "
                     "repeated-element policy."
                 )
-        total += base_points * multiplier
+        total += credited
+        line_items.append(
+            TechnicalLineItem(
+                event_id=event_id,
+                start_ms=event.start_ms,
+                label=event.label,
+                family=event.family,
+                base_points=base_points,
+                multiplier=multiplier,
+                points=credited,
+                reason=reason,
+            )
+        )
 
+    return total, warnings, line_items
+
+
+def _technical_points(
+    events: list[AnalysisEventPrediction], ruleset: Ruleset
+) -> tuple[float, list[str]]:
+    """Sum positive credit for successful technical elements, applying the
+    repeated-high-risk-element decay curve. Misses and non-success outcomes
+    never earn positive credit (per product requirement: positive vs
+    negative technical events are handled distinctly)."""
+    total, warnings, _ = _technical_points_with_line_items(events, ruleset)
     return total, warnings
+
+
+def technical_line_items(
+    events: list[AnalysisEventPrediction],
+    ruleset: Ruleset,
+    *,
+    event_ids: list[str] | None = None,
+) -> tuple[float, list[str], list[TechnicalLineItem]]:
+    """Public entry point for per-event technical credit audit rows."""
+    return _technical_points_with_line_items(events, ruleset, event_ids=event_ids)
 
 
 def technical_points(
@@ -150,25 +238,43 @@ def _deduction_points(
     deductions: list[DeductionPrediction], ruleset: Ruleset
 ) -> tuple[float, list[str]]:
     warnings: list[str] = []
-    counts_by_type: dict[DeductionType, int] = defaultdict(int)
-    for deduction in deductions:
-        counts_by_type[deduction.type] += deduction.quantity
-
+    quantity_used_by_type: dict[DeductionType, int] = defaultdict(int)
     total = 0.0
-    for deduction_type, quantity in counts_by_type.items():
-        rule = ruleset.deduction_rule_for(deduction_type)
+
+    for deduction in sorted(deductions, key=lambda d: d.timestamp_ms):
+        rule = ruleset.deduction_rule_for(deduction.type)
         if rule is None:
-            warnings.append(f"No deduction rule configured for '{deduction_type}'; skipped.")
+            warnings.append(f"No deduction rule configured for '{deduction.type}'; skipped.")
             continue
-        penalized_quantity = quantity
+
+        if deduction.points is not None:
+            row_points = deduction.points
+        else:
+            row_points = rule.points_per_occurrence * deduction.quantity
+
+        allowed_quantity = deduction.quantity
         if rule.max_occurrences_penalized is not None:
-            penalized_quantity = min(quantity, rule.max_occurrences_penalized)
-            if quantity > rule.max_occurrences_penalized:
+            cap = rule.max_occurrences_penalized
+            prior = quantity_used_by_type[deduction.type]
+            allowed_quantity = max(0, min(deduction.quantity, cap - prior))
+            quantity_used_by_type[deduction.type] += deduction.quantity
+            if allowed_quantity == 0:
                 warnings.append(
-                    f"'{deduction_type}' occurred {quantity} times; only "
-                    f"{rule.max_occurrences_penalized} penalized per ruleset cap."
+                    f"'{deduction.type}' at {deduction.timestamp_ms}ms exceeds the ruleset "
+                    f"cap of {cap}; skipped."
                 )
-        total += rule.points_per_occurrence * penalized_quantity
+                continue
+            if allowed_quantity < deduction.quantity:
+                row_points = row_points * (allowed_quantity / deduction.quantity)
+                warnings.append(
+                    f"'{deduction.type}' at {deduction.timestamp_ms}ms only "
+                    f"{allowed_quantity} of {deduction.quantity} occurrence(s) penalized "
+                    "per ruleset cap."
+                )
+        else:
+            quantity_used_by_type[deduction.type] += deduction.quantity
+
+        total += row_points
 
     return total, warnings
 

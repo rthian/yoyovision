@@ -24,7 +24,7 @@ from yoyovision_api.db_models import (
     User,
     VideoAssetORM,
 )
-from yoyovision_api.services.scoring_service import recompute_score
+from yoyovision_api.services.scoring_service import compute_score_line_items, recompute_score
 
 
 async def _make_job(session: AsyncSession, owner: User) -> AnalysisJobORM:
@@ -174,3 +174,55 @@ async def test_recompute_score_applies_confirmed_dangerous_play_review(
     breakdown = await recompute_score(db_session, job, "1a-draft-0.1")
 
     assert breakdown.major_deductions == 5.0  # 1 occurrence x 5.0 points_per_occurrence
+
+
+async def test_recompute_score_uses_human_override_deduction_points(
+    db_session: AsyncSession, test_user: User
+) -> None:
+    job = await _make_job(db_session, test_user)
+    deduction = MajorDeductionORM(
+        analysis_id=job.id,
+        type=DeductionType.YOYO_STOP,
+        timestamp_ms=5_000,
+        quantity=1,
+        points=9.5,
+        confidence=0.8,
+        source=Source.MODEL,
+        review_status=ReviewStatus.CONFIRMED,
+    )
+    db_session.add(deduction)
+    await db_session.commit()
+
+    breakdown = await recompute_score(db_session, job, "1a-draft-0.1")
+
+    assert breakdown.major_deductions == 9.5
+
+
+async def test_compute_score_line_items_returns_per_event_rows(
+    db_session: AsyncSession, test_user: User
+) -> None:
+    job = await _make_job(db_session, test_user)
+    event = AnalysisEventORM(
+        analysis_id=job.id,
+        label="mount_0",
+        family=EventFamily.MOUNT,
+        start_ms=0,
+        end_ms=500,
+        confidence=0.9,
+        outcome=Outcome.SUCCESS,
+        difficulty_band=DifficultyBand.BASIC,
+        source=Source.MODEL,
+        review_status=ReviewStatus.CONFIRMED,
+        model_name="mock-temporal-event-detector",
+        model_version="0.0.0-mock",
+    )
+    db_session.add(event)
+    await db_session.commit()
+
+    technical_raw, items = await compute_score_line_items(db_session, job, "1a-draft-0.1")
+
+    assert technical_raw == 1.0
+    assert len(items) == 1
+    assert items[0].event_id == event.id
+    assert items[0].points == 1.0
+    assert items[0].reason == "credited"

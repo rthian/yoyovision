@@ -7,8 +7,13 @@ from yoyovision_ml.domain import JobStatus
 
 from yoyovision_api.db_models import AnalysisJobORM, ScoreBreakdownORM
 from yoyovision_api.deps import DbSession, OwnedJob, SettingsDep
-from yoyovision_api.schemas import AnalysisJobRead, ScoreBreakdownRead
-from yoyovision_api.services.scoring_service import recompute_score
+from yoyovision_api.schemas import (
+    AnalysisJobRead,
+    ScoreBreakdownRead,
+    ScoreLineItemsRead,
+    TechnicalLineItemRead,
+)
+from yoyovision_api.services.scoring_service import compute_score_line_items, recompute_score
 
 router = APIRouter(prefix="/analyses", tags=["analyses"])
 
@@ -41,6 +46,18 @@ async def get_score(job: OwnedJob, session: DbSession, settings: SettingsDep) ->
     breakdown = await recompute_score(session, job, settings.ruleset_version)
     await session.commit()
     return breakdown
+
+
+@router.get("/{analysis_id}/score/line-items", response_model=ScoreLineItemsRead)
+async def get_score_line_items(
+    job: OwnedJob, session: DbSession, settings: SettingsDep
+) -> ScoreLineItemsRead:
+    """Returns per-event technical credit rows for the review UI."""
+    technical_raw, items = await compute_score_line_items(session, job, settings.ruleset_version)
+    return ScoreLineItemsRead(
+        technical_raw=technical_raw,
+        technical_line_items=[TechnicalLineItemRead.model_validate(item) for item in items],
+    )
 
 
 @router.post("/{analysis_id}/score/recompute", response_model=ScoreBreakdownRead)

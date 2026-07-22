@@ -274,6 +274,22 @@ export interface ScoreBreakdown {
   warnings: string[];
 }
 
+export interface TechnicalLineItem {
+  event_id: string | null;
+  start_ms: number;
+  label: string;
+  family: EventFamily;
+  base_points: number;
+  multiplier: number;
+  points: number;
+  reason: string;
+}
+
+export interface ScoreLineItems {
+  technical_raw: number;
+  technical_line_items: TechnicalLineItem[];
+}
+
 export interface TokenResponse {
   access_token: string;
   token_type: string;
@@ -299,6 +315,8 @@ export interface Ruleset {
   freestyle_evaluation_weights: Record<string, number>;
   technical_scale_max: number;
   freestyle_evaluation_scale_max: number;
+  technical_weight: number;
+  freestyle_evaluation_weight: number;
 }
 
 /** Shape of FastAPI's default error body: `{"detail": "..."}` or

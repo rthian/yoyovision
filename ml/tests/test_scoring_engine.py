@@ -19,6 +19,7 @@ from yoyovision_ml.scoring_engine import (
     deduction_is_scorable,
     deduction_points,
     freestyle_evaluation_points,
+    technical_line_items,
     technical_points,
 )
 
@@ -99,6 +100,42 @@ def test_repeated_non_high_risk_element_receives_full_credit_each_time() -> None
     breakdown = engine.calculate(events, [], None, ruleset)
 
     assert breakdown.technical_raw == round(ruleset.difficulty_band_points.basic * 2, 3)
+
+
+def test_deduction_human_override_points_are_authoritative() -> None:
+    ruleset = default_ruleset()
+    engine = DeterministicScoringEngine()
+    deductions = [
+        DeductionPrediction(
+            type=DeductionType.YOYO_STOP,
+            timestamp_ms=100,
+            quantity=1,
+            confidence=0.9,
+            model_name="test-model",
+            model_version="0.0.0-test",
+            points=7.5,
+        )
+    ]
+
+    breakdown = engine.calculate([], deductions, None, ruleset)
+
+    assert breakdown.major_deductions == 7.5
+
+
+def test_technical_line_items_sum_matches_technical_raw() -> None:
+    ruleset = default_ruleset()
+    events = [
+        _event("mount_1", EventFamily.MOUNT, 0, band=DifficultyBand.BASIC),
+        _event("suicide_1", EventFamily.SUICIDE, 1000, band=DifficultyBand.ADVANCED),
+        _event("suicide_1", EventFamily.SUICIDE, 2000, band=DifficultyBand.ADVANCED),
+        _event("control_miss_1", EventFamily.CONTROL_MISS, 3000),
+    ]
+
+    technical_raw, _, items = technical_line_items(events, ruleset, event_ids=["a", "b", "c", "d"])
+
+    assert round(sum(item.points for item in items), 3) == round(technical_raw, 3)
+    assert len(items) == 4
+    assert items[-1].reason == "excluded_mistake"
 
 
 def test_yoyo_stop_deduction_reduces_final_score() -> None:

@@ -29,9 +29,14 @@ from yoyovision_ml.domain import (
     EvidenceRef,
     FreestyleEvaluation,
     ReviewStatus,
+    TechnicalLineItem,
 )
 from yoyovision_ml.ruleset import Ruleset, default_ruleset, get_ruleset_by_version
-from yoyovision_ml.scoring_engine import DeterministicScoringEngine, deduction_is_scorable
+from yoyovision_ml.scoring_engine import (
+    DeterministicScoringEngine,
+    deduction_is_scorable,
+    technical_line_items,
+)
 
 from yoyovision_api.db_models import (
     AnalysisEventORM,
@@ -65,6 +70,7 @@ def _deduction_to_prediction(deduction: MajorDeductionORM) -> DeductionPredictio
         confidence=deduction.confidence,
         model_name="human" if deduction.source.value == "human" else "mock-temporal-event-detector",
         model_version="n/a",
+        points=deduction.points,
     )
 
 
@@ -141,3 +147,23 @@ async def recompute_score(
 
     await session.flush()
     return existing
+
+
+async def compute_score_line_items(
+    session: AsyncSession, job: AnalysisJobORM, ruleset_version: str
+) -> tuple[float, list[TechnicalLineItem]]:
+    """Returns per-event technical credit rows for the review UI, using the
+    same filtering rules as `recompute_score`."""
+    events_result = await session.execute(
+        select(AnalysisEventORM).where(AnalysisEventORM.analysis_id == job.id)
+    )
+    event_rows = [
+        row for row in events_result.scalars().all() if row.review_status != ReviewStatus.REJECTED
+    ]
+    ruleset = resolve_ruleset(ruleset_version)
+    predictions = [_event_to_prediction(row) for row in event_rows]
+    event_ids = [row.id for row in event_rows]
+    technical_raw, _, items = technical_line_items(
+        predictions, ruleset, event_ids=event_ids
+    )
+    return technical_raw, items
