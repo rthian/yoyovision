@@ -91,6 +91,13 @@ export function AnalysisJobList({
               <span className="text-sm text-content-dim">
                 Started {formatDateTime(job.created_at)} - pipeline {job.pipeline_version}
               </span>
+              {job.model_versions && Object.keys(job.model_versions).length > 0 ? (
+                <span className="text-xs text-content-dim">
+                  {Object.entries(job.model_versions)
+                    .map(([role, version]) => `${role}: ${version}`)
+                    .join(" · ")}
+                </span>
+              ) : null}
               {job.status === "failed" && job.error_message ? (
                 <span role="alert" className="text-sm text-status-alert">
                   {job.error_message}

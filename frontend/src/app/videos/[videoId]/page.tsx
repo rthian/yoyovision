@@ -4,6 +4,7 @@ import { useParams } from "next/navigation";
 import { useState } from "react";
 
 import { AnalysisJobList } from "@/components/AnalysisJobList";
+import { ShadowComparisonPanel } from "@/components/ShadowComparisonPanel";
 import { AuthGate } from "@/components/AuthGate";
 
 import { useAuth } from "@/hooks/useAuth";
@@ -84,6 +85,8 @@ function VideoDetail({ videoId }: { videoId: string }): JSX.Element {
       {analysesQuery.isLoading ? (
         <p className="text-sm text-content-dim">Loading...</p>
       ) : (
+        <>
+        <ShadowComparisonPanel jobs={analysesQuery.data ?? []} enabled={isAuthenticated} />
         <AnalysisJobList
           jobs={analysesQuery.data ?? []}
           onCancel={(analysisId) => cancelAnalysisMutation.mutate(analysisId)}
@@ -95,6 +98,7 @@ function VideoDetail({ videoId }: { videoId: string }): JSX.Element {
             deleteAnalysisMutation.isPending ? deleteAnalysisMutation.variables : undefined
           }
         />
+        </>
       )}
     </div>
   );
