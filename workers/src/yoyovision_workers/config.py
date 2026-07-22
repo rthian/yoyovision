@@ -53,6 +53,17 @@ class Settings(BaseSettings):
     #: from Postgres while a job is running.
     pipeline_cancel_poll_interval_s: float = 5.0
 
+    #: Perception adapter names (see `ml/src/yoyovision_ml/adapters_registry.py`
+    #: and `docs/adapters.md`). Defaults keep the deterministic mock adapters.
+    pipeline_pose_adapter: str = "mock"
+    pipeline_hand_adapter: str = "mock"
+    pipeline_yoyo_adapter: str = "mock"
+    pipeline_tracker_adapter: str = "mock"
+    pipeline_temporal_event_adapter: str = "mock"
+    #: Kalman tracker tuning when `pipeline_tracker_adapter=kalman`.
+    pipeline_tracker_max_gap_ms: int = 500
+    pipeline_tracker_static_camera: bool = False
+
 
 @lru_cache
 def get_settings() -> Settings:

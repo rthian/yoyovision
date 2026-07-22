@@ -65,6 +65,10 @@ from yoyovision_ml.media_validation import probe_video_metadata
 from yoyovision_ml.pipeline import PipelineResult, StageCallback, run_analysis_pipeline
 from yoyovision_ml.ruleset import Ruleset, default_ruleset, get_ruleset_by_version
 
+from yoyovision_workers.adapter_config import (
+    build_pipeline_adapter_kwargs,
+    ensure_real_adapters_registered,
+)
 from yoyovision_workers.config import Settings
 from yoyovision_workers.db import get_engine, reset_engine
 from yoyovision_workers.logging_setup import get_logger
@@ -258,6 +262,16 @@ async def _run_pipeline_for_job(
 
     job_ruleset = job_row.get("ruleset_version") or settings.ruleset_version
     ruleset = get_ruleset_by_version(job_ruleset) or default_ruleset()
+    ensure_real_adapters_registered(settings)
+    adapter_kwargs = build_pipeline_adapter_kwargs(settings)
+    job_logger.info(
+        "pipeline_adapters",
+        pose=settings.pipeline_pose_adapter,
+        hand=settings.pipeline_hand_adapter,
+        yoyo=settings.pipeline_yoyo_adapter,
+        tracker=settings.pipeline_tracker_adapter,
+        temporal=settings.pipeline_temporal_event_adapter,
+    )
 
     probed_duration_ms = video_row["duration_ms"] or 0
     probed_fps = video_row["fps"] or _DEFAULT_FPS_IF_UNKNOWN
@@ -294,6 +308,12 @@ async def _run_pipeline_for_job(
             duration_ms=probed_duration_ms,
             fps=probed_fps,
             ruleset=ruleset,
+            pose_adapter_name=settings.pipeline_pose_adapter,
+            hand_adapter_name=settings.pipeline_hand_adapter,
+            yoyo_adapter_name=settings.pipeline_yoyo_adapter,
+            tracker_adapter_name=settings.pipeline_tracker_adapter,
+            temporal_event_adapter_name=settings.pipeline_temporal_event_adapter,
+            adapter_kwargs=adapter_kwargs,
             sample_fps=settings.pipeline_sample_fps,
             device_preference=settings.pipeline_device,
             model_registry=get_model_registry(),

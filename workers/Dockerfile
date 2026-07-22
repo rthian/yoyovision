@@ -19,7 +19,8 @@ COPY workers/src workers/src
 # these copied paths for local dev, so editable mode picks up host-side
 # edits without a rebuild. The same image is used unmodified in any
 # environment that instead ships code via the built layer (no bind mount).
-RUN pip install --no-cache-dir -e ./ml -e ./workers
+# Install mediapipe extra so PIPELINE_*_ADAPTER=mediapipe works in containers.
+RUN pip install --no-cache-dir -e "./ml[mediapipe]" -e ./workers
 
 # No CMD: docker-compose.yml supplies the queue-specific `celery ... worker`
 # command per service (worker-cpu / worker-gpu), per the "Separate CPU and
