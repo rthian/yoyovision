@@ -201,6 +201,21 @@ class ScoreLineItemsRead(BaseModel):
     technical_line_items: list[TechnicalLineItemRead]
 
 
+class ScorePreviewRead(BaseModel):
+    up_to_ms: int
+    completed_event_count: int
+    active_event_id: str | None
+    technical_raw: float
+    technical_scaled: float
+    freestyle_evaluation_raw: float
+    freestyle_evaluation_scaled: float
+    major_deductions: float
+    final_score: float
+    confidence: float
+    ruleset_version: str
+    warnings: list[str]
+
+
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"

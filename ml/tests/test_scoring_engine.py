@@ -21,6 +21,7 @@ from yoyovision_ml.scoring_engine import (
     freestyle_evaluation_points,
     technical_line_items,
     technical_points,
+    score_preview_at_ms,
 )
 
 
@@ -136,6 +137,72 @@ def test_technical_line_items_sum_matches_technical_raw() -> None:
     assert round(sum(item.points for item in items), 3) == round(technical_raw, 3)
     assert len(items) == 4
     assert items[-1].reason == "excluded_mistake"
+
+
+def test_score_preview_at_ms_credits_only_completed_tricks() -> None:
+    ruleset = default_ruleset()
+    events = [
+        AnalysisEventPrediction(
+            label="mount_1",
+            family=EventFamily.MOUNT,
+            start_ms=0,
+            end_ms=1000,
+            confidence=0.9,
+            outcome=Outcome.SUCCESS,
+            difficulty_band=DifficultyBand.BASIC,
+            model_name="test-model",
+            model_version="0.0.0-test",
+        ),
+        AnalysisEventPrediction(
+            label="mount_2",
+            family=EventFamily.MOUNT,
+            start_ms=2000,
+            end_ms=3000,
+            confidence=0.9,
+            outcome=Outcome.SUCCESS,
+            difficulty_band=DifficultyBand.BASIC,
+            model_name="test-model",
+            model_version="0.0.0-test",
+        ),
+    ]
+
+    before_second_finishes = score_preview_at_ms(events, [], None, ruleset, up_to_ms=1500)
+    after_both_complete = score_preview_at_ms(events, [], None, ruleset, up_to_ms=3500)
+
+    basic = ruleset.difficulty_band_points.basic
+    assert before_second_finishes.technical_raw == basic
+    assert after_both_complete.technical_raw == round(basic * 2, 3)
+
+
+def test_score_preview_at_ms_includes_only_occurred_deductions() -> None:
+    ruleset = default_ruleset()
+    deductions = [
+        DeductionPrediction(
+            type=DeductionType.YOYO_STOP,
+            timestamp_ms=1000,
+            quantity=1,
+            confidence=0.9,
+            model_name="test-model",
+            model_version="0.0.0-test",
+        ),
+        DeductionPrediction(
+            type=DeductionType.YOYO_STOP,
+            timestamp_ms=5000,
+            quantity=1,
+            confidence=0.9,
+            model_name="test-model",
+            model_version="0.0.0-test",
+            points=4.0,
+        ),
+    ]
+
+    early = score_preview_at_ms([], deductions, None, ruleset, up_to_ms=2000)
+    late = score_preview_at_ms([], deductions, None, ruleset, up_to_ms=6000)
+
+    rule = ruleset.deduction_rule_for(DeductionType.YOYO_STOP)
+    assert rule is not None
+    assert early.major_deductions == rule.points_per_occurrence
+    assert late.major_deductions == round(rule.points_per_occurrence + 4.0, 3)
 
 
 def test_yoyo_stop_deduction_reduces_final_score() -> None:

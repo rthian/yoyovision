@@ -398,3 +398,29 @@ class DeterministicScoringEngine:
             ruleset_version=ruleset.version,
             warnings=[*warnings, *technical_warnings, *deduction_warnings, *fe_warnings],
         )
+
+
+def score_preview_at_ms(
+    events: list[AnalysisEventPrediction],
+    deductions: list[DeductionPrediction],
+    freestyle_evaluation: FreestyleEvaluation | None,
+    ruleset: Ruleset,
+    up_to_ms: int,
+) -> ScoreBreakdown:
+    """Scores only tricks completed by `up_to_ms` (`end_ms <= up_to_ms`) and
+    deductions that have occurred by then (`timestamp_ms <= up_to_ms`).
+    Freestyle Evaluation is not playhead-gated -- it reflects the full manual
+    entry for the routine."""
+    if up_to_ms < 0:
+        raise ValueError("up_to_ms must be non-negative")
+
+    completed_events = [event for event in events if event.end_ms <= up_to_ms]
+    occurred_deductions = [
+        deduction for deduction in deductions if deduction.timestamp_ms <= up_to_ms
+    ]
+    return DeterministicScoringEngine().calculate(
+        events=completed_events,
+        deductions=occurred_deductions,
+        freestyle_evaluation=freestyle_evaluation,
+        ruleset=ruleset,
+    )

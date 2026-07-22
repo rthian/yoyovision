@@ -29,12 +29,14 @@ from yoyovision_ml.domain import (
     EvidenceRef,
     FreestyleEvaluation,
     ReviewStatus,
+    ScoreBreakdown,
     TechnicalLineItem,
 )
 from yoyovision_ml.ruleset import Ruleset, default_ruleset, get_ruleset_by_version
 from yoyovision_ml.scoring_engine import (
     DeterministicScoringEngine,
     deduction_is_scorable,
+    score_preview_at_ms,
     technical_line_items,
 )
 
@@ -167,3 +169,51 @@ async def compute_score_line_items(
         predictions, ruleset, event_ids=event_ids
     )
     return technical_raw, items
+
+
+async def _load_scoring_inputs(
+    session: AsyncSession, job: AnalysisJobORM, ruleset_version: str
+) -> tuple[
+    list[AnalysisEventORM],
+    list[AnalysisEventPrediction],
+    list[DeductionPrediction],
+    FreestyleEvaluation | None,
+    Ruleset,
+]:
+    events_result = await session.execute(
+        select(AnalysisEventORM).where(AnalysisEventORM.analysis_id == job.id)
+    )
+    deductions_result = await session.execute(
+        select(MajorDeductionORM).where(MajorDeductionORM.analysis_id == job.id)
+    )
+    evaluation_result = await session.execute(
+        select(FreestyleEvaluationORM).where(FreestyleEvaluationORM.analysis_id == job.id)
+    )
+
+    event_rows = [
+        row for row in events_result.scalars().all() if row.review_status != ReviewStatus.REJECTED
+    ]
+    ruleset = resolve_ruleset(ruleset_version)
+    predictions = [_event_to_prediction(row) for row in event_rows]
+    deductions = [
+        _deduction_to_prediction(d)
+        for d in deductions_result.scalars().all()
+        if deduction_is_scorable(d.type, d.review_status, ruleset)
+    ]
+    evaluation = _evaluation_to_domain(evaluation_result.scalar_one_or_none())
+    return event_rows, predictions, deductions, evaluation, ruleset
+
+
+async def compute_score_preview(
+    session: AsyncSession, job: AnalysisJobORM, ruleset_version: str, up_to_ms: int
+) -> tuple[ScoreBreakdown, list[AnalysisEventORM], int]:
+    """Returns a playhead-gated score preview plus the event rows used for
+    active/completed highlighting in the review UI."""
+    event_rows, predictions, deductions, evaluation, ruleset = await _load_scoring_inputs(
+        session, job, ruleset_version
+    )
+    breakdown = score_preview_at_ms(
+        predictions, deductions, evaluation, ruleset, up_to_ms=up_to_ms
+    )
+    completed_count = sum(1 for row in event_rows if row.end_ms <= up_to_ms)
+    return breakdown, event_rows, completed_count

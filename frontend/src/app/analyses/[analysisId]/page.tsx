@@ -10,12 +10,14 @@ import { EventTable } from "@/components/EventTable";
 import { EventTimeline } from "@/components/EventTimeline";
 import { ExportButtons } from "@/components/ExportButtons";
 import { FreestyleEvaluationForm } from "@/components/FreestyleEvaluationForm";
+import { LiveScoreStrip } from "@/components/LiveScoreStrip";
 import { RulesetPanel } from "@/components/RulesetPanel";
 import { ScoreBreakdownPanel } from "@/components/ScoreBreakdownPanel";
 import { VideoPlayerWithOverlay } from "@/components/VideoPlayerWithOverlay";
 
 import { useAnalysisJob, useScore, useScoreLineItems } from "@/hooks/useAnalysis";
 import type { TechnicalLineItem } from "@/lib/types";
+import { computeLiveScorePreview } from "@/lib/live-score-preview";
 import { useAuth } from "@/hooks/useAuth";
 import { useDeductions } from "@/hooks/useDeductions";
 import { useEvaluation } from "@/hooks/useEvaluation";
@@ -71,6 +73,23 @@ function AnalysisReview({ analysisId }: { analysisId: string }): JSX.Element {
     return map;
   }, [lineItemsQuery.data]);
 
+  const score = scoreQuery.data ?? null;
+  const ruleset = rulesetQuery.data ?? null;
+  const deductions = deductionsQuery.data ?? [];
+  const livePreview =
+    score && ruleset
+      ? computeLiveScorePreview(
+          events,
+          lineItemsByEventId,
+          deductions,
+          score,
+          ruleset,
+          currentMs
+        )
+      : null;
+  const activeEventLabel =
+    events.find((event) => event.id === livePreview?.active_event_id)?.label ?? null;
+
   function handleSeek(ms: number): void {
     setSeekToMs(ms);
     setCurrentMs(ms);
@@ -106,6 +125,13 @@ function AnalysisReview({ analysisId }: { analysisId: string }): JSX.Element {
           currentMs={currentMs}
           onSeek={handleSeek}
         />
+        {livePreview ? (
+          <LiveScoreStrip
+            preview={livePreview}
+            ruleset={ruleset}
+            activeEventLabel={activeEventLabel}
+          />
+        ) : null}
       </div>
 
       <section className="flex flex-col gap-3">
@@ -114,6 +140,8 @@ function AnalysisReview({ analysisId }: { analysisId: string }): JSX.Element {
           analysisId={analysisId}
           events={events}
           lineItemsByEventId={lineItemsByEventId}
+          currentMs={currentMs}
+          activeEventId={livePreview?.active_event_id ?? null}
           onSeek={handleSeek}
         />
       </section>
@@ -133,8 +161,8 @@ function AnalysisReview({ analysisId }: { analysisId: string }): JSX.Element {
       <section className="flex flex-col gap-3">
         <ScoreBreakdownPanel
           analysisId={analysisId}
-          score={scoreQuery.data ?? null}
-          ruleset={rulesetQuery.data ?? null}
+          score={score}
+          ruleset={ruleset}
         />
         <RulesetPanel ruleset={rulesetQuery.data ?? null} />
       </section>

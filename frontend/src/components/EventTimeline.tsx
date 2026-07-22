@@ -49,11 +49,20 @@ export function EventTimeline({
             0.5,
             ((eventItem.end_ms - eventItem.start_ms) / safeDuration) * 100
           );
+          const isActive = currentMs >= eventItem.start_ms && currentMs <= eventItem.end_ms;
           return (
-            <div
+            <button
               key={eventItem.id}
+              type="button"
               title={`${eventItem.label} (${formatMsAsTimecode(eventItem.start_ms)})`}
-              className={`absolute top-1 h-6 rounded-full opacity-80 ${OUTCOME_COLORS[eventItem.outcome]}`}
+              aria-label={`Seek to ${eventItem.label}`}
+              onClick={(clickEvent) => {
+                clickEvent.stopPropagation();
+                onSeek(eventItem.start_ms);
+              }}
+              className={`absolute top-1 h-6 rounded-full opacity-80 ${OUTCOME_COLORS[eventItem.outcome]} ${
+                isActive ? "ring-2 ring-status-informative ring-offset-1" : ""
+              }`}
               style={{ left: `${left}%`, width: `${width}%` }}
             />
           );

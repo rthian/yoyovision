@@ -34,6 +34,8 @@ interface EventTableProps {
   analysisId: string;
   events: AnalysisEvent[];
   lineItemsByEventId: Map<string, TechnicalLineItem>;
+  currentMs: number;
+  activeEventId: string | null;
   onSeek: (ms: number) => void;
 }
 
@@ -45,6 +47,8 @@ export function EventTable({
   analysisId,
   events,
   lineItemsByEventId,
+  currentMs,
+  activeEventId,
   onSeek,
 }: EventTableProps): JSX.Element {
   const updateEvent = useUpdateEvent(analysisId);
@@ -95,8 +99,16 @@ export function EventTable({
             </tr>
           </thead>
           <tbody>
-            {events.map((event) => (
-              <tr key={event.id} className="border-t border-outline-softest">
+            {events.map((event) => {
+              const isActive = event.id === activeEventId;
+              const isCompleted = event.end_ms <= currentMs;
+              const rowClass = isActive
+                ? "bg-status-informative/10"
+                : isCompleted
+                  ? "bg-status-positive/5"
+                  : "";
+              return (
+              <tr key={event.id} className={`border-t border-outline-softest ${rowClass}`}>
                 <td className="px-3 py-2">
                   <button
                     type="button"
@@ -246,10 +258,11 @@ export function EventTable({
                   </div>
                 </td>
               </tr>
-            ))}
+            );
+            })}
             {events.length === 0 ? (
               <tr>
-                <td colSpan={9} className="px-3 py-4 text-center text-content-dim">
+                <td colSpan={10} className="px-3 py-4 text-center text-content-dim">
                   No events detected yet.
                 </td>
               </tr>

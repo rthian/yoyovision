@@ -24,7 +24,7 @@ from yoyovision_api.db_models import (
     User,
     VideoAssetORM,
 )
-from yoyovision_api.services.scoring_service import compute_score_line_items, recompute_score
+from yoyovision_api.services.scoring_service import compute_score_line_items, compute_score_preview, recompute_score
 
 
 async def _make_job(session: AsyncSession, owner: User) -> AnalysisJobORM:
@@ -226,3 +226,51 @@ async def test_compute_score_line_items_returns_per_event_rows(
     assert items[0].event_id == event.id
     assert items[0].points == 1.0
     assert items[0].reason == "credited"
+
+
+async def test_compute_score_preview_credits_only_completed_tricks(
+    db_session: AsyncSession, test_user: User
+) -> None:
+    job = await _make_job(db_session, test_user)
+    early_event = AnalysisEventORM(
+        analysis_id=job.id,
+        label="mount_0",
+        family=EventFamily.MOUNT,
+        start_ms=0,
+        end_ms=1000,
+        confidence=0.9,
+        outcome=Outcome.SUCCESS,
+        difficulty_band=DifficultyBand.BASIC,
+        source=Source.MODEL,
+        review_status=ReviewStatus.CONFIRMED,
+        model_name="mock-temporal-event-detector",
+        model_version="0.0.0-mock",
+    )
+    late_event = AnalysisEventORM(
+        analysis_id=job.id,
+        label="mount_1",
+        family=EventFamily.MOUNT,
+        start_ms=2000,
+        end_ms=3000,
+        confidence=0.9,
+        outcome=Outcome.SUCCESS,
+        difficulty_band=DifficultyBand.BASIC,
+        source=Source.MODEL,
+        review_status=ReviewStatus.CONFIRMED,
+        model_name="mock-temporal-event-detector",
+        model_version="0.0.0-mock",
+    )
+    db_session.add_all([early_event, late_event])
+    await db_session.commit()
+
+    mid_preview, _, completed_mid = await compute_score_preview(
+        db_session, job, "1a-draft-0.1", up_to_ms=1500
+    )
+    end_preview, _, completed_end = await compute_score_preview(
+        db_session, job, "1a-draft-0.1", up_to_ms=3500
+    )
+
+    assert mid_preview.technical_raw == 1.0
+    assert completed_mid == 1
+    assert end_preview.technical_raw == 2.0
+    assert completed_end == 2

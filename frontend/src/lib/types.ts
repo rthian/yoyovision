@@ -290,6 +290,21 @@ export interface ScoreLineItems {
   technical_line_items: TechnicalLineItem[];
 }
 
+export interface ScorePreview {
+  up_to_ms: number;
+  completed_event_count: number;
+  active_event_id: string | null;
+  technical_raw: number;
+  technical_scaled: number;
+  freestyle_evaluation_raw: number;
+  freestyle_evaluation_scaled: number;
+  major_deductions: number;
+  final_score: number;
+  confidence: number;
+  ruleset_version: string;
+  warnings: string[];
+}
+
 export interface TokenResponse {
   access_token: string;
   token_type: string;

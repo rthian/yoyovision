@@ -21,6 +21,7 @@ import type {
   Ruleset,
   ScoreBreakdown,
   ScoreLineItems,
+  ScorePreview,
   TokenResponse,
   VideoAsset,
 } from "@/lib/types";
@@ -216,6 +217,12 @@ export function getScore(analysisId: string): Promise<ScoreBreakdown> {
 
 export function getScoreLineItems(analysisId: string): Promise<ScoreLineItems> {
   return request<ScoreLineItems>(`/analyses/${analysisId}/score/line-items`);
+}
+
+export function getScorePreview(analysisId: string, upToMs: number): Promise<ScorePreview> {
+  return request<ScorePreview>(`/analyses/${analysisId}/score/preview`, {
+    query: { up_to_ms: upToMs },
+  });
 }
 
 export function recomputeScore(analysisId: string): Promise<ScoreBreakdown> {
