@@ -70,7 +70,7 @@ It ships:
 - Evaluation metrics (detector precision/recall, centre-point error, track
   coverage, longest missing interval, interpolation rate) and a debug
   overlay-video renderer.
-- The `yoyovision-perception` CLI (`run` / `evaluate` / `overlay`).
+- The `yoyovision-perception` CLI (`run` / `evaluate` / `overlay` / `train`).
 
 See [`docs/adapters.md`](docs/adapters.md) for the full adapter list and how
 to add another one.

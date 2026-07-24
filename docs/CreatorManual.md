@@ -205,8 +205,15 @@ No yo-yo detector checkpoint ships with this repo. Real slots exist:
 - `pytorch` — set `YOYOVISION_TORCH_YOYO_WEIGHTS`
 - `onnx` — set `YOYOVISION_ONNX_YOYO_MODEL`
 
-Train against `yoyo_track` annotations, then point the worker/env at your
-checkpoint. Bad yo-yo detection degrades trajectory features
+Train against `yoyo_track` annotations:
+
+```bash
+yoyovision-perception train --dataset-dir /path/to/dataset --output-dir out --name yoyo \
+  --sample-fps 15 --max-epochs 30
+```
+
+Then point the worker/env at your checkpoint (`PIPELINE_YOYO_ADAPTER=pytorch`,
+`PIPELINE_YOYO_WEIGHTS=out/yoyo.pt`). Bad yo-yo detection degrades trajectory features
 (`yoyo_velocity`, `yoyo_direction_deg`, etc.) that the temporal model depends on.
 
 ---
@@ -372,7 +379,7 @@ Use this as a concrete order of operations for your first non-mock detector:
 - [ ] Run `yoyovision-perception` with `mediapipe` + `kalman` on those videos
 - [x] Bridge dataset + perception Parquets → `ml/scripts/prepare_training_corpus.py`
 - [ ] Evaluate on **held-out players**, not the train set
-- [ ] Train or configure a **yo-yo detector** if trajectory quality is weak
+- [ ] Train or configure a **yo-yo detector** (`yoyovision-perception train --dataset-dir …`) if trajectory quality is weak
 - [ ] Point worker at `temporal_event_adapter_name="torch"` + checkpoint path
 - [ ] Align **feature extraction** between train and worker pipeline
 - [ ] Re-run analysis (shadow first), review in UI, export corrections, retrain

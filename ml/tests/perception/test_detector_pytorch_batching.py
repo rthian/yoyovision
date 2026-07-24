@@ -17,9 +17,9 @@ torch = pytest.importorskip("torch")
 
 
 def _write_checkpoint(path: Path) -> None:
-    from yoyovision_ml.perception.detector_pytorch import _build_tiny_yoyo_net
+    from yoyovision_ml.perception.model import build_tiny_yoyo_net
 
-    net = _build_tiny_yoyo_net(torch)
+    net = build_tiny_yoyo_net(torch)
     torch.save({"state_dict": net.state_dict(), "model_version": "test-checkpoint-v1"}, path)
 
 

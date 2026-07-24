@@ -19,13 +19,13 @@ from yoyovision_ml.adapters_registry import register_yoyo_detector
 from yoyovision_ml.domain import BoundingBox, Detection
 from yoyovision_ml.interfaces import FrameRef
 from yoyovision_ml.perception._image_utils import hwc_uint8_to_chw_float01, resize_nearest
+from yoyovision_ml.perception.model import INPUT_SIZE, build_tiny_yoyo_net
 from yoyovision_ml.perception.errors import (
     MissingOptionalDependencyError,
     ModelWeightsNotConfiguredError,
 )
 
 ENV_WEIGHTS_VAR = "YOYOVISION_TORCH_YOYO_WEIGHTS"
-_INPUT_SIZE = 128  # px, square crop/resize fed to the placeholder network
 
 
 def _import_torch() -> Any:
@@ -34,43 +34,6 @@ def _import_torch() -> Any:
     except ImportError as exc:
         raise MissingOptionalDependencyError("torch", "torch") from exc
     return torch
-
-
-def _build_tiny_yoyo_net(torch_module: Any) -> Any:
-    """Defines the placeholder architecture lazily -- it needs `torch.nn`,
-    which must not be imported at module load time (torch may be absent).
-    """
-    nn = torch_module.nn
-
-    class TinyYoyoNet(nn.Module):  # type: ignore[misc, name-defined]
-        """A deliberately small conv net: 3 conv/pool blocks -> a 5-value
-        head `(x, y, width, height, confidence_logit)` over the full frame.
-
-        NOT a trained/validated architecture. It exists purely so this
-        adapter has something concrete to load a real checkpoint into and
-        run a real forward pass with.
-        """
-
-        def __init__(self) -> None:
-            super().__init__()
-            self.features = nn.Sequential(
-                nn.Conv2d(3, 16, 3, padding=1),
-                nn.ReLU(),
-                nn.MaxPool2d(2),
-                nn.Conv2d(16, 32, 3, padding=1),
-                nn.ReLU(),
-                nn.MaxPool2d(2),
-                nn.Conv2d(32, 64, 3, padding=1),
-                nn.ReLU(),
-                nn.AdaptiveAvgPool2d(1),
-            )
-            self.head = nn.Linear(64, 5)
-
-        def forward(self, x: Any) -> Any:
-            features = self.features(x).flatten(1)
-            return self.head(features)
-
-    return TinyYoyoNet()
 
 
 @register_yoyo_detector("pytorch")
@@ -105,7 +68,7 @@ class PyTorchYoyoDetector:
         self._torch = torch
         self._device = device
         self._batch_size = batch_size
-        self._model = _build_tiny_yoyo_net(torch)
+        self._model = build_tiny_yoyo_net(torch)
         # `weights_only=True` restricts unpickling to tensors/plain Python
         # containers -- a checkpoint file is untrusted input (may have been
         # uploaded or shared), so we never allow arbitrary object unpickling.
@@ -164,6 +127,6 @@ class PyTorchYoyoDetector:
     def _preprocess(self, array: Any) -> Any:
         import numpy as np
 
-        resized = resize_nearest(np.asarray(array), (_INPUT_SIZE, _INPUT_SIZE))
+        resized = resize_nearest(np.asarray(array), (INPUT_SIZE, INPUT_SIZE))
         chw = hwc_uint8_to_chw_float01(resized)
         return self._torch.from_numpy(chw.copy()).float()

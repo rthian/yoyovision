@@ -14,6 +14,9 @@ Usage:
     python -m yoyovision_ml.perception.cli overlay <video_path> --duration-ms 20000 --fps 30 \\
         --output <overlay.mp4> [adapter options as above]
 
+    python -m yoyovision_ml.perception.cli train --output-dir <dir> --name <name> \
+        [--dataset-dir /path/to/dataset] [--seed 42] [--max-epochs 30]
+
 Also installed as the `yoyovision-perception` console script (see pyproject.toml).
 """
 
@@ -43,6 +46,11 @@ from yoyovision_ml.perception.evaluation import (
 )
 from yoyovision_ml.perception.overlay import render_overlay_video
 from yoyovision_ml.perception.pipeline import PerceptionPipeline
+from yoyovision_ml.perception.checkpoint import YoyoDetectorMetadata, save_checkpoint
+from yoyovision_ml.perception.config import DetectorTrainingConfig
+from yoyovision_ml.perception.dataset_bridge import DatasetBridgeError, load_detector_samples_from_dataset
+from yoyovision_ml.perception.synthetic import generate_synthetic_detector_samples
+from yoyovision_ml.perception.train import train_detector
 
 
 def _build_pipeline(args: argparse.Namespace) -> PerceptionPipeline:
@@ -144,6 +152,65 @@ def _cmd_overlay(args: argparse.Namespace) -> int:
     return 0
 
 
+
+
+def _cmd_train(args: argparse.Namespace) -> int:
+    config = DetectorTrainingConfig(
+        seed=args.seed,
+        sample_fps=args.sample_fps,
+        point_box_size=args.point_box_size,
+        batch_size=args.batch_size,
+        learning_rate=args.learning_rate,
+        weight_decay=args.weight_decay,
+        max_epochs=args.max_epochs,
+        early_stopping_patience=args.early_stopping_patience,
+        train_ratio=args.train_ratio,
+        val_ratio=args.val_ratio,
+    )
+    try:
+        if args.dataset_dir:
+            samples = load_detector_samples_from_dataset(Path(args.dataset_dir), config=config)
+            training_data_source = "dataset"
+        else:
+            samples = generate_synthetic_detector_samples(
+                seed=args.seed,
+                num_players=args.num_players,
+                frames_per_player=args.frames_per_player,
+            )
+            training_data_source = "synthetic"
+        result = train_detector(
+            samples,
+            config=config,
+            model_name=args.name,
+            training_data_source=training_data_source,
+        )
+        metadata = YoyoDetectorMetadata(
+            model_name=result.model_name,
+            model_version=result.model_version,
+            training_config=result.config,
+            player_splits=result.player_splits,
+            best_epoch=result.best_epoch,
+            val_loss_history=result.val_loss_history,
+            val_metrics=result.val_metrics,
+            test_metrics=result.test_metrics,
+            train_sample_count=result.train_sample_count,
+            val_sample_count=result.val_sample_count,
+            test_sample_count=result.test_sample_count,
+            torch_version=result.torch_module.__version__,
+            training_data_source=result.training_data_source,
+        )
+        weights_path, metadata_path = save_checkpoint(
+            result.torch_module, result.model, metadata, Path(args.output_dir), args.name
+        )
+    except (MissingOptionalDependencyError, DatasetBridgeError, ValueError) as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 1
+
+    print(f"Wrote checkpoint weights: {weights_path}")
+    print(f"Wrote checkpoint metadata: {metadata_path}")
+    print(f"training_data_source: {training_data_source}")
+    return 0
+
 def _add_adapter_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--duration-ms", type=int, required=True)
     parser.add_argument("--fps", type=float, required=True)
@@ -162,6 +229,25 @@ def _add_adapter_arguments(parser: argparse.ArgumentParser) -> None:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="yoyovision-perception")
     subparsers = parser.add_subparsers(dest="command", required=True)
+
+
+    train_parser = subparsers.add_parser("train", help="Train the TinyYoyoNet yo-yo detector.")
+    train_parser.add_argument("--output-dir", required=True)
+    train_parser.add_argument("--name", default="yoyo-detector")
+    train_parser.add_argument("--dataset-dir", default=None, help="Annotated dataset root with yoyo_track.")
+    train_parser.add_argument("--seed", type=int, default=42)
+    train_parser.add_argument("--sample-fps", type=float, default=15.0)
+    train_parser.add_argument("--point-box-size", type=float, default=0.05)
+    train_parser.add_argument("--batch-size", type=int, default=16)
+    train_parser.add_argument("--learning-rate", type=float, default=1e-3)
+    train_parser.add_argument("--weight-decay", type=float, default=1e-4)
+    train_parser.add_argument("--max-epochs", type=int, default=30)
+    train_parser.add_argument("--early-stopping-patience", type=int, default=6)
+    train_parser.add_argument("--train-ratio", type=float, default=0.7)
+    train_parser.add_argument("--val-ratio", type=float, default=0.15)
+    train_parser.add_argument("--num-players", type=int, default=4)
+    train_parser.add_argument("--frames-per-player", type=int, default=8)
+    train_parser.set_defaults(func=_cmd_train)
 
     run_parser = subparsers.add_parser("run", help="Run the perception pipeline on one video.")
     run_parser.add_argument("video_path")
