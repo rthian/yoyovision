@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from yoyovision_ml.domain import JobStatus, PipelineStage
+from yoyovision_ml.pipeline_config import PipelineAdapterConfig
 
 from yoyovision_api.celery_client import enqueue_analysis_pipeline
 from yoyovision_api.config import Settings
@@ -11,7 +12,11 @@ from yoyovision_api.db_models import AnalysisJobORM, VideoAssetORM
 
 
 async def create_and_dispatch_analysis_job(
-    session: AsyncSession, settings: Settings, video: VideoAssetORM, is_shadow: bool = False
+    session: AsyncSession,
+    settings: Settings,
+    video: VideoAssetORM,
+    is_shadow: bool = False,
+    pipeline_adapter_config: PipelineAdapterConfig | dict[str, object] | None = None,
 ) -> AnalysisJobORM:
     """Creates a `pending` `AnalysisJobORM` row and enqueues the worker task
     that will run the (currently mock-adapter) pipeline for it. Per product
@@ -31,6 +36,11 @@ async def create_and_dispatch_analysis_job(
         pipeline_version=settings.pipeline_version,
         ruleset_version=settings.ruleset_version,
         is_shadow=is_shadow,
+        pipeline_adapter_config=(
+            pipeline_adapter_config.model_dump(exclude_none=True)
+            if isinstance(pipeline_adapter_config, PipelineAdapterConfig)
+            else pipeline_adapter_config
+        ),
     )
     session.add(job)
     await session.flush()

@@ -9,44 +9,47 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 
+from yoyovision_ml.pipeline_config import (
+    EffectivePipelineConfig,
+    PipelineAdapterConfig,
+    resolve_effective_pipeline_config,
+)
+
 from yoyovision_workers.config import Settings
 
 
-def uses_non_mock_perception(settings: Settings) -> bool:
+def uses_non_mock_perception(effective: EffectivePipelineConfig) -> bool:
     """True when any perception-stage adapter is not the packaged mock."""
     return any(
         name != "mock"
         for name in (
-            settings.pipeline_pose_adapter,
-            settings.pipeline_hand_adapter,
-            settings.pipeline_yoyo_adapter,
-            settings.pipeline_tracker_adapter,
+            effective.pose_adapter,
+            effective.hand_adapter,
+            effective.yoyo_adapter,
+            effective.tracker_adapter,
         )
     )
 
 
-def uses_non_mock_temporal(settings: Settings) -> bool:
-    return settings.pipeline_temporal_event_adapter != "mock"
+def uses_non_mock_temporal(effective: EffectivePipelineConfig) -> bool:
+    return effective.temporal_event_adapter != "mock"
 
 
-def ensure_real_adapters_registered(settings: Settings) -> None:
+def ensure_real_adapters_registered(effective: EffectivePipelineConfig) -> None:
     """Register real adapter factories before `run_analysis_pipeline` resolves names."""
-    if uses_non_mock_perception(settings):
+    if uses_non_mock_perception(effective):
         import yoyovision_ml.perception  # noqa: F401
-    if uses_non_mock_temporal(settings):
+    if uses_non_mock_temporal(effective):
         import yoyovision_ml.events  # noqa: F401
 
 
 def build_pipeline_adapter_kwargs(settings: Settings) -> Mapping[str, Mapping[str, object]]:
-    """Per-role constructor kwargs forwarded to `adapters_registry.create_*`."""
-    kwargs: dict[str, dict[str, object]] = {}
-    if settings.pipeline_tracker_adapter == "kalman":
-        kwargs["tracker"] = {
-            "max_gap_ms": settings.pipeline_tracker_max_gap_ms,
-            "static_camera": settings.pipeline_tracker_static_camera,
-        }
-    if settings.pipeline_temporal_event_adapter == "torch":
-        weights_path = settings.pipeline_temporal_event_weights
-        if weights_path:
-            kwargs["temporal_event"] = {"weights_path": weights_path}
-    return kwargs
+    """Per-role constructor kwargs from worker settings only (no job overrides)."""
+    return resolve_effective_pipeline_config(None, settings).adapter_kwargs
+
+
+def resolve_job_pipeline_config(
+    job_config: PipelineAdapterConfig | Mapping[str, object] | None,
+    settings: Settings,
+) -> EffectivePipelineConfig:
+    return resolve_effective_pipeline_config(job_config, settings)

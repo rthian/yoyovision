@@ -131,6 +131,17 @@ export interface VideoAsset {
   deleted_at: string | null;
 }
 
+export interface PipelineAdapterConfig {
+  pose_adapter?: string;
+  hand_adapter?: string;
+  yoyo_adapter?: string;
+  tracker_adapter?: string;
+  temporal_event_adapter?: string;
+  sample_fps?: number;
+  device?: string;
+  adapter_kwargs?: Record<string, Record<string, unknown>>;
+}
+
 export interface AnalysisJob {
   id: string;
   video_id: string;
@@ -160,6 +171,7 @@ export interface AnalysisJob {
   review_state: AnalysisReviewState;
   submitted_at: string | null;
   ruleset_version: string;
+  pipeline_adapter_config: PipelineAdapterConfig | null;
 }
 
 export interface AnalysisEvent {

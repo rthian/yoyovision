@@ -68,6 +68,7 @@ analysis_jobs = Table(
     Column("submitted_at", DateTime(timezone=True), nullable=True),
     Column("submitted_by", String(36), nullable=True),
     Column("ruleset_version", String(32), nullable=False, default="1a-draft-0.1"),
+    Column("pipeline_adapter_config", JSON, nullable=True),
 )
 
 analysis_events = Table(

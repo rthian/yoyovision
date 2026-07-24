@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field
+from yoyovision_ml.pipeline_config import PipelineAdapterConfig
 from yoyovision_ml.domain import (
     AnalysisReviewState,
     DeductionType,
@@ -70,6 +71,7 @@ class AnalysisJobRead(BaseModel):
     review_state: AnalysisReviewState = AnalysisReviewState.DRAFT
     submitted_at: datetime | None = None
     ruleset_version: str = "1a-draft-0.1"
+    pipeline_adapter_config: PipelineAdapterConfig | None = None
 
 
 class RoutineWindowUpdate(BaseModel):
@@ -79,6 +81,14 @@ class RoutineWindowUpdate(BaseModel):
 
 class RulesetVersionUpdate(BaseModel):
     ruleset_version: str = Field(min_length=1, max_length=32)
+
+
+class PipelineAdapterConfigUpdate(BaseModel):
+    pipeline_adapter_config: PipelineAdapterConfig | None = None
+
+
+class AnalysisJobCreate(BaseModel):
+    pipeline_adapter_config: PipelineAdapterConfig | None = None
 
 
 class AnalysisEventRead(BaseModel):

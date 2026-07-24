@@ -148,6 +148,8 @@ class AnalysisJobORM(Base):
     ruleset_version: Mapped[str] = mapped_column(
         String(32), nullable=False, default="1a-draft-0.1"
     )
+    #: Optional per-job adapter overrides merged over worker env at run time.
+    pipeline_adapter_config: Mapped[dict[str, object] | None] = mapped_column(JSON, nullable=True)
 
     video: Mapped[VideoAssetORM] = relationship(back_populates="jobs")
     events: Mapped[list[AnalysisEventORM]] = relationship(

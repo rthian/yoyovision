@@ -63,6 +63,9 @@ class Settings(BaseSettings):
     #: Path to a `.pt` checkpoint from `yoyovision-events train` when temporal adapter is torch.
     #: Falls back to `YOYOVISION_TORCH_EVENT_WEIGHTS` inside the detector if unset.
     pipeline_temporal_event_weights: str | None = None
+    #: Path to a yo-yo detector checkpoint when yoyo adapter is pytorch/onnx.
+    #: Falls back to YOYOVISION_TORCH_YOYO_WEIGHTS / YOYOVISION_ONNX_YOYO_MODEL.
+    pipeline_yoyo_weights: str | None = None
     #: Kalman tracker tuning when `pipeline_tracker_adapter=kalman`.
     pipeline_tracker_max_gap_ms: int = 500
     pipeline_tracker_static_camera: bool = False

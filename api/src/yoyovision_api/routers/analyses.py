@@ -15,6 +15,7 @@ from yoyovision_api.deps import CurrentUser, DbSession, OwnedJob, SettingsDep
 from yoyovision_api.schemas import (
     AnalysisJobRead,
     RoutineWindowUpdate,
+    PipelineAdapterConfigUpdate,
     RulesetVersionUpdate,
     ScoreBreakdownRead,
     ScoreLineItemsRead,
@@ -198,6 +199,28 @@ async def reopen_analysis(job: OwnedJob, session: DbSession) -> AnalysisJobORM:
     return job
 
 
+
+
+@router.patch("/{analysis_id}/pipeline-config", response_model=AnalysisJobRead)
+async def update_analysis_pipeline_config(
+    job: OwnedJob,
+    payload: PipelineAdapterConfigUpdate,
+    session: DbSession,
+) -> AnalysisJobORM:
+    """Sets per-job adapter overrides for a pending analysis run."""
+    if job.status != JobStatus.PENDING:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Pipeline adapter config can only be changed while the analysis is pending.",
+        )
+    job.pipeline_adapter_config = (
+        payload.pipeline_adapter_config.model_dump(exclude_none=True)
+        if payload.pipeline_adapter_config is not None
+        else None
+    )
+    await session.commit()
+    await session.refresh(job)
+    return job
 
 
 @router.patch("/{analysis_id}/ruleset", response_model=AnalysisJobRead)

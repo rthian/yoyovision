@@ -138,3 +138,60 @@ async def test_patch_analysis_ruleset_updates_version_and_recomputes(
     assert score.status_code == 200
     assert score.json()["ruleset_version"] == "iyyf-wyyc-25-draft"
 
+
+
+async def test_trigger_analysis_persists_pipeline_adapter_config(
+    client: AsyncClient, auth_headers: dict[str, str]
+) -> None:
+    upload = await client.post(
+        "/videos", headers=auth_headers, files={"file": ("a.mp4", _MP4_BODY, "video/mp4")}
+    )
+    video_id = upload.json()["id"]
+
+    response = await client.post(
+        f"/videos/{video_id}/analyses",
+        params={"shadow": True},
+        headers=auth_headers,
+        json={
+            "pipeline_adapter_config": {
+                "pose_adapter": "mediapipe",
+                "temporal_event_adapter": "torch",
+                "adapter_kwargs": {
+                    "temporal_event": {"weights_path": "/models/events.pt"}
+                },
+            }
+        },
+    )
+    assert response.status_code == 201
+    payload = response.json()
+    assert payload["pipeline_adapter_config"]["pose_adapter"] == "mediapipe"
+    assert payload["pipeline_adapter_config"]["temporal_event_adapter"] == "torch"
+
+
+async def test_patch_pipeline_config_only_while_pending(
+    client: AsyncClient, auth_headers: dict[str, str], db_session: object
+) -> None:
+    from yoyovision_ml.domain import JobStatus
+
+    from yoyovision_api.db_models import AnalysisJobORM
+
+    job_id = await _upload_and_get_job_id(client, auth_headers)
+    patch = await client.patch(
+        f"/analyses/{job_id}/pipeline-config",
+        headers=auth_headers,
+        json={"pipeline_adapter_config": {"hand_adapter": "mediapipe"}},
+    )
+    assert patch.status_code == 200
+    assert patch.json()["pipeline_adapter_config"]["hand_adapter"] == "mediapipe"
+
+    job = await db_session.get(AnalysisJobORM, job_id)  # type: ignore[attr-defined]
+    assert job is not None
+    job.status = JobStatus.COMPLETED
+    await db_session.commit()  # type: ignore[attr-defined]
+
+    blocked = await client.patch(
+        f"/analyses/{job_id}/pipeline-config",
+        headers=auth_headers,
+        json={"pipeline_adapter_config": {"hand_adapter": "mock"}},
+    )
+    assert blocked.status_code == 409

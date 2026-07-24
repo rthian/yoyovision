@@ -280,9 +280,9 @@ training corpus**), or assemble records manually under `videos/` and
    weights, temporal `torch` with TCN checkpoint, tracker `kalman`.
 2. **Align features** — worker kinematic features already match TCN training; verify checkpoint metadata
    at train and inference time.
-3. **Extend worker settings** — today `workers/src/yoyovision_workers/config.py`
-   exposes sample FPS and device, not adapter names; you may need env vars or
-   code changes to select adapters without editing `pipeline_runner.py` each time.
+3. **Per-job adapter profiles** — set `pipeline_adapter_config` when triggering a
+   shadow analysis (`POST /videos/{id}/analyses`) or patch a pending job
+   (`PATCH /analyses/{id}/pipeline-config`). Worker env vars remain the default.
 4. **Re-run analyses** — compare events and confidence in the review UI; use
    shadow mode (`?shadow=true` on analysis create) to trial new weights without
    replacing the official result.
@@ -370,7 +370,7 @@ Use this as a concrete order of operations for your first non-mock detector:
 - [ ] Annotate **2–3 full 1A routines** (`trick_events` + `yoyo_track` minimum)
 - [ ] Run `yoyovision-dataset validate` and `split` with player-grouped holds
 - [ ] Run `yoyovision-perception` with `mediapipe` + `kalman` on those videos
-- [ ] Bridge dataset + perception Parquets → `yoyovision-events train` (script TBD)
+- [x] Bridge dataset + perception Parquets → `ml/scripts/prepare_training_corpus.py`
 - [ ] Evaluate on **held-out players**, not the train set
 - [ ] Train or configure a **yo-yo detector** if trajectory quality is weak
 - [ ] Point worker at `temporal_event_adapter_name="torch"` + checkpoint path

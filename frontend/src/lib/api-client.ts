@@ -11,6 +11,7 @@ import type {
   AnalysisEventCreate,
   AnalysisEventUpdate,
   AnalysisJob,
+  PipelineAdapterConfig,
   ApiErrorBody,
   FreestyleEvaluation,
   FreestyleEvaluationUpsert,
@@ -185,11 +186,14 @@ export function listVideoAnalyses(videoId: string): Promise<AnalysisJob[]> {
 
 export function triggerVideoAnalysis(
   videoId: string,
-  options?: { shadow?: boolean }
+  options?: { shadow?: boolean; pipeline_adapter_config?: PipelineAdapterConfig | null }
 ): Promise<AnalysisJob> {
   return request<AnalysisJob>(`/videos/${videoId}/analyses`, {
     method: "POST",
     query: { shadow: options?.shadow },
+    jsonBody: options?.pipeline_adapter_config
+      ? { pipeline_adapter_config: options.pipeline_adapter_config }
+      : undefined,
   });
 }
 

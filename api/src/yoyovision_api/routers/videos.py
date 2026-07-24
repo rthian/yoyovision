@@ -11,7 +11,7 @@ from yoyovision_ml.media_validation import ALLOWED_MIME_TYPES
 
 from yoyovision_api.db_models import AnalysisJobORM, VideoAssetORM
 from yoyovision_api.deps import CurrentUser, DbSession, OwnedVideo, SettingsDep, StorageDep
-from yoyovision_api.schemas import AnalysisJobRead, VideoAssetRead
+from yoyovision_api.schemas import AnalysisJobCreate, AnalysisJobRead, VideoAssetRead
 from yoyovision_api.security import MediaValidationError
 from yoyovision_api.services.job_service import create_and_dispatch_analysis_job
 from yoyovision_api.services.video_service import create_video_from_upload
@@ -134,6 +134,7 @@ async def trigger_video_analysis(
     video: OwnedVideo,
     session: DbSession,
     settings: SettingsDep,
+    payload: AnalysisJobCreate | None = None,
     shadow: bool = Query(
         default=False,
         description=(
@@ -146,7 +147,15 @@ async def trigger_video_analysis(
 ) -> AnalysisJobORM:
     """Manually (re-)triggers analysis for a video (e.g. after a failed run,
     or to try a new model version in shadow mode)."""
-    job = await create_and_dispatch_analysis_job(session, settings, video, is_shadow=shadow)
+    job = await create_and_dispatch_analysis_job(
+        session,
+        settings,
+        video,
+        is_shadow=shadow,
+        pipeline_adapter_config=(
+            payload.pipeline_adapter_config if payload is not None else None
+        ),
+    )
     await session.commit()
     return job
 

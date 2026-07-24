@@ -66,8 +66,8 @@ from yoyovision_ml.pipeline import PipelineResult, StageCallback, run_analysis_p
 from yoyovision_ml.ruleset import Ruleset, default_ruleset, get_ruleset_by_version
 
 from yoyovision_workers.adapter_config import (
-    build_pipeline_adapter_kwargs,
     ensure_real_adapters_registered,
+    resolve_job_pipeline_config,
 )
 from yoyovision_workers.config import Settings
 from yoyovision_workers.db import get_engine, reset_engine
@@ -262,15 +262,18 @@ async def _run_pipeline_for_job(
 
     job_ruleset = job_row.get("ruleset_version") or settings.ruleset_version
     ruleset = get_ruleset_by_version(job_ruleset) or default_ruleset()
-    ensure_real_adapters_registered(settings)
-    adapter_kwargs = build_pipeline_adapter_kwargs(settings)
+    pipeline_config = resolve_job_pipeline_config(
+        job_row.get("pipeline_adapter_config"), settings
+    )
+    ensure_real_adapters_registered(pipeline_config)
+    adapter_kwargs = pipeline_config.adapter_kwargs
     job_logger.info(
         "pipeline_adapters",
-        pose=settings.pipeline_pose_adapter,
-        hand=settings.pipeline_hand_adapter,
-        yoyo=settings.pipeline_yoyo_adapter,
-        tracker=settings.pipeline_tracker_adapter,
-        temporal=settings.pipeline_temporal_event_adapter,
+        pose=pipeline_config.pose_adapter,
+        hand=pipeline_config.hand_adapter,
+        yoyo=pipeline_config.yoyo_adapter,
+        tracker=pipeline_config.tracker_adapter,
+        temporal=pipeline_config.temporal_event_adapter,
     )
 
     probed_duration_ms = video_row["duration_ms"] or 0
@@ -308,14 +311,14 @@ async def _run_pipeline_for_job(
             duration_ms=probed_duration_ms,
             fps=probed_fps,
             ruleset=ruleset,
-            pose_adapter_name=settings.pipeline_pose_adapter,
-            hand_adapter_name=settings.pipeline_hand_adapter,
-            yoyo_adapter_name=settings.pipeline_yoyo_adapter,
-            tracker_adapter_name=settings.pipeline_tracker_adapter,
-            temporal_event_adapter_name=settings.pipeline_temporal_event_adapter,
+            pose_adapter_name=pipeline_config.pose_adapter,
+            hand_adapter_name=pipeline_config.hand_adapter,
+            yoyo_adapter_name=pipeline_config.yoyo_adapter,
+            tracker_adapter_name=pipeline_config.tracker_adapter,
+            temporal_event_adapter_name=pipeline_config.temporal_event_adapter,
             adapter_kwargs=adapter_kwargs,
-            sample_fps=settings.pipeline_sample_fps,
-            device_preference=settings.pipeline_device,
+            sample_fps=pipeline_config.sample_fps,
+            device_preference=pipeline_config.device,
             model_registry=get_model_registry(),
             cancellation=cancellation,
             stage_callback=stage_callback,
