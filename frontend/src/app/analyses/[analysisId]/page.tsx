@@ -134,7 +134,7 @@ function AnalysisReview({ analysisId }: { analysisId: string }): JSX.Element {
     <div className="mx-auto flex max-w-5xl flex-col gap-8">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-content-default">Analysis review</h1>
-        <ExportButtons analysisId={analysisId} />
+        <ExportButtons analysisId={analysisId} reviewState={job.review_state ?? "draft"} />
       </div>
 
       {job.is_shadow ? (

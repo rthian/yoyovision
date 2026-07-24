@@ -20,10 +20,10 @@ x-python-env: &python-env
   PIPELINE_TEMPORAL_EVENT_ADAPTER: ${PIPELINE_TEMPORAL_EVENT_ADAPTER:-mock}
   PIPELINE_TRACKER_MAX_GAP_MS: ${PIPELINE_TRACKER_MAX_GAP_MS:-500}
   PIPELINE_TRACKER_STATIC_CAMERA: ${PIPELINE_TRACKER_STATIC_CAMERA:-false}
-  PIPELINE_TEMPORAL_EVENT_ADAPTER: ${PIPELINE_TEMPORAL_EVENT_ADAPTER:-mock}
   PIPELINE_TEMPORAL_EVENT_WEIGHTS: ${PIPELINE_TEMPORAL_EVENT_WEIGHTS:-}
   YOYOVISION_TORCH_EVENT_WEIGHTS: ${YOYOVISION_TORCH_EVENT_WEIGHTS:-}
   ENVIRONMENT: ${ENVIRONMENT:-development}
+  DATASET_CORPUS_ROOT: ${DATASET_CORPUS_ROOT:-/data/corpus}
 
 services:
   postgres:
@@ -81,6 +81,7 @@ services:
       - ./api:/app/api
       - ./ml:/app/ml
       - storage_data:/data/storage
+      - corpus_data:/data/corpus
     command: >
       sh -c "cd /app/api && alembic upgrade head &&
              uvicorn yoyovision_api.main:app --host 0.0.0.0 --port 8000 --reload"
@@ -139,6 +140,7 @@ services:
       - /app/.next
 
 volumes:
+  corpus_data:
   postgres_data:
   minio_data:
   storage_data:

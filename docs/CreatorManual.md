@@ -158,8 +158,10 @@ Sample layout: `ml/sample_data/dataset_v1/` (synthetic placeholder — not real 
 The analysis review page supports confirm / reject / edit / add / delete on
 events. That improves **scoring for judging today**. To use corrections for
 **training**, export or convert reviewed events into `DatasetRecord.trick_events`
-format. There is no one-click “export training set” yet — plan for a conversion
-step or manual export pipeline.
+format. On the review page, **Add to training corpus** (visible after submit)
+appends the adjudicated `DatasetRecord` plus video bytes into the corpus directory
+configured by `DATASET_CORPUS_ROOT` (see `POST /analyses/{id}/export/corpus`).
+You can still download a single-record JSON export for ad-hoc use.
 
 ---
 
@@ -192,9 +194,9 @@ yoyovision-perception overlay video.mp4 --duration-ms 221860 --fps 60 \
   --output overlay.mp4 --pose-adapter mediapipe
 ```
 
-**Note:** Production Celery workers still default to `"mock"` adapters. Swapping
-to MediaPipe in the live app requires configuration changes in
-`workers/src/yoyovision_workers/pipeline_runner.py` (see [`adapters.md`](adapters.md)).
+**Note:** Celery workers read adapter names from env vars (`PIPELINE_POSE_ADAPTER`,
+`PIPELINE_HAND_ADAPTER`, `PIPELINE_TRACKER_ADAPTER`, `PIPELINE_YOYO_ADAPTER`,
+`PIPELINE_TEMPORAL_EVENT_ADAPTER`, plus checkpoint paths). See [`adapters.md`](adapters.md).
 
 #### Yo-yo detector (train or supply weights)
 
@@ -252,23 +254,23 @@ yoyovision-events compare-baselines --num-players 6 --clips-per-player 2
 Set `YOYOVISION_TORCH_EVENT_WEIGHTS` (or pass weights via adapter kwargs) and use
 `temporal_event_adapter_name="torch"` in `run_analysis_pipeline`.
 
-#### Critical gap: real-footage training path
+#### Real-footage training path
 
-Infrastructure exists (dataset schema, perception Parquets, train loop), but
-**there is no single command yet** that converts annotated `DatasetRecord` files
-+ videos → perception features → `yoyovision-events train` on real footage.
-Building that bridge (or a small internal script) is required before training
-on uploaded competition footage instead of synthetic data.
+`ml/scripts/prepare_training_corpus.py` chains:
 
-#### Feature alignment gap (production)
+1. `yoyovision-dataset validate` on a corpus directory
+2. `PerceptionPipeline.run_and_write` for each adjudicated record
+3. `yoyovision-events train --dataset-dir … --perception-dir …`
 
-The worker path uses `DeterministicFeatureExtractor` in
-`ml/src/yoyovision_ml/feature_extraction.py` (~4 merged features). The TCN
-trains on richer kinematic columns from
-`ml/src/yoyovision_ml/perception/features.py` (~18 features). Before a trained
-TCN helps in the app, perception output must feed event detection — either wire
-`PerceptionPipeline` artifacts into `run_analysis_pipeline` or replace the
-feature extractor with `compute_kinematic_features`.
+Populate the corpus from submitted reviews (`DATASET_CORPUS_ROOT` + **Add to
+training corpus**), or assemble records manually under `videos/` and
+`records/`.
+
+#### Feature alignment (production)
+
+`ml/src/yoyovision_ml/pipeline.py` now uses `compute_kinematic_features()`
+(~18 kinematic columns) so worker inference matches TCN training inputs. Set
+`PIPELINE_TEMPORAL_EVENT_ADAPTER=torch` and point weights at your checkpoint.
 
 ---
 
@@ -276,7 +278,7 @@ feature extractor with `compute_kinematic_features`.
 
 1. **Configure adapters** — pose/hand `mediapipe`, yo-yo `pytorch`/`onnx` with
    weights, temporal `torch` with TCN checkpoint, tracker `kalman`.
-2. **Align features** — ensure the temporal model sees the same feature vector
+2. **Align features** — worker kinematic features already match TCN training; verify checkpoint metadata
    at train and inference time.
 3. **Extend worker settings** — today `workers/src/yoyovision_workers/config.py`
    exposes sample FPS and device, not adapter names; you may need env vars or

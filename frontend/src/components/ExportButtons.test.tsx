@@ -44,6 +44,14 @@ describe("ExportButtons", () => {
     await waitFor(() => expect(clickSpy).toHaveBeenCalledTimes(1));
   });
 
+  it("shows the corpus button only for submitted reviews", () => {
+    render(<ExportButtons analysisId="analysis-1" reviewState="draft" />);
+    expect(screen.queryByRole("button", { name: /Add to training corpus/ })).not.toBeInTheDocument();
+
+    render(<ExportButtons analysisId="analysis-1" reviewState="submitted" />);
+    expect(screen.getByRole("button", { name: /Add to training corpus/ })).toBeInTheDocument();
+  });
+
   it("disables the other export buttons while one export is pending", async () => {
     let resolveExport: (value: { blob: Blob; filename: string | null }) => void = () => {};
     vi.spyOn(apiClient, "exportDeductionsCsv").mockImplementation(

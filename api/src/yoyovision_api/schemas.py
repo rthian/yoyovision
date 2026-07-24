@@ -243,3 +243,10 @@ class TokenResponse(BaseModel):
 class LoginRequest(BaseModel):
     email: str
     password: str
+
+
+class CorpusExportRead(BaseModel):
+    record_id: str
+    record_path: str
+    corpus_root: str
+    video_path: str

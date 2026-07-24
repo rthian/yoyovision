@@ -123,3 +123,41 @@ async def test_export_dataset_record_matches_schema(
         f"/analyses/{analysis_id}/export/dataset-record.json", headers=auth_headers
     )
     assert submitted.json()["is_adjudicated"] is True
+
+
+async def test_export_to_training_corpus_requires_submitted_review(
+    client: AsyncClient,
+    auth_headers: dict[str, str],
+    db_session: AsyncSession,
+    test_settings,
+) -> None:
+    analysis_id, _ = await _upload_analysis_with_one_event(client, auth_headers)
+    await _mark_completed(db_session, analysis_id)
+    test_settings.dataset_corpus_root = "/tmp/unused-corpus"
+
+    draft = await client.post(f"/analyses/{analysis_id}/export/corpus", headers=auth_headers)
+    assert draft.status_code == 422
+
+
+async def test_export_to_training_corpus_writes_record_and_video(
+    client: AsyncClient,
+    auth_headers: dict[str, str],
+    db_session: AsyncSession,
+    test_settings,
+    tmp_path,
+) -> None:
+    analysis_id, _ = await _upload_analysis_with_one_event(client, auth_headers)
+    await _mark_completed(db_session, analysis_id)
+    await client.post(f"/analyses/{analysis_id}/submit", headers=auth_headers)
+
+    corpus_dir = tmp_path / "corpus"
+    test_settings.dataset_corpus_root = str(corpus_dir)
+
+    response = await client.post(f"/analyses/{analysis_id}/export/corpus", headers=auth_headers)
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["record_id"].startswith(analysis_id)
+    assert (corpus_dir / payload["record_path"]).exists()
+    assert (corpus_dir / payload["video_path"]).exists()
+    manifest = json.loads((corpus_dir / "manifest.json").read_text())
+    assert manifest["video_ids"]

@@ -400,6 +400,21 @@ export async function exportDeductionsCsv(
   return requestBlob(`/analyses/${analysisId}/export/deductions.csv`);
 }
 
+export interface CorpusExportResult {
+  record_id: string;
+  record_path: string;
+  corpus_root: string;
+  video_path: string;
+}
+
+export async function exportToTrainingCorpus(
+  analysisId: string
+): Promise<CorpusExportResult> {
+  return request<CorpusExportResult>(`/analyses/${analysisId}/export/corpus`, {
+    method: "POST",
+  });
+}
+
 export async function exportDatasetRecord(
   analysisId: string
 ): Promise<{ blob: Blob; filename: string | null }> {

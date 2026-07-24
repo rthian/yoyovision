@@ -41,12 +41,13 @@ format for training the eventual trick-detection model: Pydantic schemas,
 a versioned trick-label ontology (`dataset/ontology/v1.yaml`), player-grouped
 split generation, cross-video validation, dataset statistics/agreement
 reporting, a CVAT box/point-track importer, and a `yoyovision-dataset` CLI
-(`validate` / `stats` / `split` / `import-cvat`). A synthetic sample dataset
+(`validate` / `stats` / `split` / `import-cvat` / `merge-cvat`). A synthetic sample dataset
 lives under `ml/sample_data/dataset_v1/` (placeholder videos, hand-authored
 annotations — not real footage). See
 [`docs/annotation_handbook.md`](docs/annotation_handbook.md) for the
-annotator-facing guide. No training model exists yet; this is dataset
-infrastructure only.
+annotator-facing guide. Submitted reviews can be appended to an on-disk corpus
+via `POST /analyses/{id}/export/corpus` (`DATASET_CORPUS_ROOT`). Use
+`ml/scripts/prepare_training_corpus.py` to validate, run perception, and train.
 
 ## Perception pipeline (pose, hand, yo-yo detection/tracking)
 

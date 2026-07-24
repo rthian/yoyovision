@@ -2,7 +2,13 @@
 
 import { useState } from "react";
 
-import { exportDeductionsCsv, exportDatasetRecord, exportEventsCsv, exportReportJson } from "@/lib/api-client";
+import {
+  exportDeductionsCsv,
+  exportDatasetRecord,
+  exportEventsCsv,
+  exportReportJson,
+  exportToTrainingCorpus,
+} from "@/lib/api-client";
 
 function triggerDownload(blob: Blob, filename: string): void {
   const url = URL.createObjectURL(blob);
@@ -17,14 +23,16 @@ function triggerDownload(blob: Blob, filename: string): void {
 
 interface ExportButtonsProps {
   analysisId: string;
+  reviewState?: "draft" | "submitted";
 }
 
 /** JSON and CSV export per MVP scope. Filenames come from the server's
  * `Content-Disposition` header (already sanitized server-side via
  * `sanitize_export_filename`), with a sane fallback if that header is
  * somehow missing. */
-export function ExportButtons({ analysisId }: ExportButtonsProps): JSX.Element {
+export function ExportButtons({ analysisId, reviewState = "draft" }: ExportButtonsProps): JSX.Element {
   const [pendingExport, setPendingExport] = useState<string | null>(null);
+  const [corpusMessage, setCorpusMessage] = useState<string | null>(null);
 
   async function handleExport(
     key: string,
@@ -40,8 +48,23 @@ export function ExportButtons({ analysisId }: ExportButtonsProps): JSX.Element {
     }
   }
 
+  async function handleAddToCorpus(): Promise<void> {
+    setPendingExport("corpus");
+    setCorpusMessage(null);
+    try {
+      const result = await exportToTrainingCorpus(analysisId);
+      setCorpusMessage(`Added to corpus: ${result.record_path}`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Could not add to training corpus.";
+      setCorpusMessage(message);
+    } finally {
+      setPendingExport(null);
+    }
+  }
+
   return (
-    <div className="flex flex-wrap gap-2">
+    <div className="flex flex-col gap-2">
+      <div className="flex flex-wrap gap-2">
       <button
         type="button"
         disabled={pendingExport !== null}
@@ -98,6 +121,22 @@ export function ExportButtons({ analysisId }: ExportButtonsProps): JSX.Element {
       >
         {pendingExport === "dataset" ? "Exporting..." : "Export dataset record (JSON)"}
       </button>
+      {reviewState === "submitted" ? (
+        <button
+          type="button"
+          disabled={pendingExport !== null}
+          onClick={() => void handleAddToCorpus()}
+          className="rounded-full border border-brand-primary-default bg-brand-primary-softest px-4 py-2 text-sm font-semibold text-brand-primary-boldest hover:bg-brand-primary-soft disabled:opacity-60"
+        >
+          {pendingExport === "corpus" ? "Adding..." : "Add to training corpus"}
+        </button>
+      ) : null}
+      </div>
+      {corpusMessage ? (
+        <p role="status" className="text-sm text-content-dim">
+          {corpusMessage}
+        </p>
+      ) : null}
     </div>
   );
 }

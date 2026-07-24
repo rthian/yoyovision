@@ -49,6 +49,10 @@ class Settings(BaseSettings):
     pipeline_version: str = "0.1.0-dev"
     ruleset_version: str = "1a-draft-0.1"
 
+    #: On-disk directory for versioned `DatasetRecord` + video exports used by
+    #: `ml/scripts/prepare_training_corpus.py`. Unset disables corpus append.
+    dataset_corpus_root: str | None = None
+
     @property
     def cors_origins_list(self) -> list[str]:
         return [origin.strip() for origin in self.api_cors_origins.split(",") if origin.strip()]

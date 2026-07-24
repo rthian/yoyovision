@@ -5,6 +5,7 @@ from __future__ import annotations
 from fastapi import APIRouter, HTTPException, status
 from fastapi.responses import Response
 from sqlalchemy import select
+from yoyovision_ml.dataset.io import load_record
 from yoyovision_ml.exports import (
     export_analysis_json,
     export_deductions_csv,
@@ -19,6 +20,12 @@ from yoyovision_api.db_models import (
     VideoAssetORM,
 )
 from yoyovision_api.deps import CurrentUser, DbSession, OwnedJob, SettingsDep, StorageDep
+from yoyovision_api.schemas import CorpusExportRead
+from yoyovision_api.services.corpus_service import (
+    CorpusExportError,
+    CorpusNotConfiguredError,
+    append_analysis_to_corpus,
+)
 from yoyovision_api.services.dataset_export_service import build_dataset_record
 from yoyovision_api.services.scoring_service import job_ruleset_version
 from yoyovision_api.services.domain_mapping import (
@@ -120,3 +127,48 @@ async def export_dataset_record(
         media_type="application/json",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
+
+
+@router.post("/corpus", response_model=CorpusExportRead)
+async def export_to_training_corpus(
+    job: OwnedJob,
+    session: DbSession,
+    current_user: CurrentUser,
+    settings: SettingsDep,
+    storage: StorageDep,
+) -> CorpusExportRead:
+    """Appends a submitted analysis into the configured on-disk training corpus."""
+    video = await _load_video(job, session)
+    try:
+        record_path, relative_record_path = await append_analysis_to_corpus(
+            session,
+            settings,
+            job,
+            video,
+            current_user,
+            storage,
+        )
+    except CorpusNotConfiguredError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=str(exc),
+        ) from exc
+    except CorpusExportError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(exc),
+        ) from exc
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(exc),
+        ) from exc
+
+    record = load_record(record_path)
+    return CorpusExportRead(
+        record_id=record.record_id,
+        record_path=relative_record_path,
+        corpus_root=settings.dataset_corpus_root or "",
+        video_path=record.video.relative_path,
+    )
+
