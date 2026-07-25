@@ -15,7 +15,14 @@ from yoyovision_ml.events.config import InferenceConfig, TrainingConfig
 from yoyovision_ml.events.dataset_bridge import load_training_samples_from_dataset
 from yoyovision_ml.events.train import train_model
 from yoyovision_ml.perception import pipeline as perception_module  # noqa: F401
+from yoyovision_ml.perception.checkpoint import YoyoDetectorMetadata, save_checkpoint as save_yoyo_checkpoint
+from yoyovision_ml.perception.config import DetectorTrainingConfig
+from yoyovision_ml.perception.dataset_bridge import (
+    DatasetBridgeError,
+    load_detector_samples_from_dataset,
+)
 from yoyovision_ml.perception.pipeline import PerceptionPipeline
+from yoyovision_ml.perception.train import train_detector
 
 
 def _validate_dataset_dir(dataset_dir: Path) -> int:
@@ -81,6 +88,49 @@ def _run_perception(
         print(f"  wrote {parquet_path}")
 
 
+def _train_yoyo_detector(
+    dataset_dir: Path,
+    model_dir: Path,
+    train_name: str,
+    *,
+    seed: int,
+    max_epochs: int,
+    sample_fps: float,
+) -> None:
+    config = DetectorTrainingConfig(seed=seed, max_epochs=max_epochs, sample_fps=sample_fps)
+    try:
+        samples = load_detector_samples_from_dataset(dataset_dir, config=config)
+        result = train_detector(
+            samples,
+            config=config,
+            model_name=train_name,
+            training_data_source="dataset",
+        )
+    except (DatasetBridgeError, ValueError) as exc:
+        raise RuntimeError(str(exc)) from exc
+
+    metadata = YoyoDetectorMetadata(
+        model_name=result.model_name,
+        model_version=result.model_version,
+        training_config=result.config,
+        player_splits=result.player_splits,
+        best_epoch=result.best_epoch,
+        val_loss_history=result.val_loss_history,
+        val_metrics=result.val_metrics,
+        test_metrics=result.test_metrics,
+        train_sample_count=result.train_sample_count,
+        val_sample_count=result.val_sample_count,
+        test_sample_count=result.test_sample_count,
+        torch_version=result.torch_module.__version__,
+        training_data_source=result.training_data_source,
+    )
+    weights_path, metadata_path = save_yoyo_checkpoint(
+        result.torch_module, result.model, metadata, model_dir, train_name
+    )
+    print(f"Wrote yo-yo detector weights: {weights_path}")
+    print(f"Wrote yo-yo detector metadata: {metadata_path}")
+
+
 def _train_model(
     dataset_dir: Path,
     perception_dir: Path,
@@ -138,6 +188,10 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--skip-validate", action="store_true")
     parser.add_argument("--skip-perception", action="store_true")
     parser.add_argument("--skip-train", action="store_true")
+    parser.add_argument("--yoyo-model-dir", default=None)
+    parser.add_argument("--train-yoyo-name", default="yoyo-detector")
+    parser.add_argument("--skip-train-yoyo", action="store_true")
+    parser.add_argument("--yoyo-max-epochs", type=int, default=30)
     parser.add_argument("--train-name", default="tcn")
     parser.add_argument("--feature-subset", default="fused")
     parser.add_argument("--seed", type=int, default=42)
@@ -167,6 +221,25 @@ def main(argv: list[str] | None = None) -> int:
             tracker_max_gap_ms=args.tracker_max_gap_ms,
             tracker_static_camera=args.tracker_static_camera,
         )
+
+    if not args.skip_train_yoyo:
+        if args.yoyo_model_dir is None:
+            print(
+                "Skipping yo-yo detector training (pass --yoyo-model-dir to enable).",
+            )
+        else:
+            try:
+                _train_yoyo_detector(
+                    dataset_dir,
+                    Path(args.yoyo_model_dir),
+                    args.train_yoyo_name,
+                    seed=args.seed,
+                    max_epochs=args.yoyo_max_epochs,
+                    sample_fps=args.sample_fps,
+                )
+            except Exception as exc:
+                print(f"error: {exc}", file=sys.stderr)
+                return 1
 
     if not args.skip_train:
         if args.model_dir is None:

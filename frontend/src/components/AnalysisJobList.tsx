@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 
+import { summarizePipelineAdapterConfig } from "@/components/ShadowAdapterPanel";
 import { formatDateTime } from "@/lib/format";
 import type { AnalysisJob } from "@/lib/types";
 
@@ -96,6 +97,11 @@ export function AnalysisJobList({
                   {Object.entries(job.model_versions)
                     .map(([role, version]) => `${role}: ${version}`)
                     .join(" · ")}
+                </span>
+              ) : null}
+              {summarizePipelineAdapterConfig(job.pipeline_adapter_config) ? (
+                <span className="text-xs text-content-dim">
+                  Adapters: {summarizePipelineAdapterConfig(job.pipeline_adapter_config)}
                 </span>
               ) : null}
               {job.status === "failed" && job.error_message ? (

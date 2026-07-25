@@ -4,6 +4,7 @@ import { useParams } from "next/navigation";
 import { useState } from "react";
 
 import { AnalysisJobList } from "@/components/AnalysisJobList";
+import { ShadowAdapterPanel } from "@/components/ShadowAdapterPanel";
 import { ShadowComparisonPanel } from "@/components/ShadowComparisonPanel";
 import { AuthGate } from "@/components/AuthGate";
 
@@ -17,10 +18,13 @@ import {
 } from "@/hooks/useVideos";
 import { ApiError } from "@/lib/api-client";
 import { formatBytes, formatDateTime } from "@/lib/format";
+import type { PipelineAdapterConfig } from "@/lib/types";
 
 function VideoDetail({ videoId }: { videoId: string }): JSX.Element {
   const { isAuthenticated } = useAuth();
   const [shadowMode, setShadowMode] = useState(false);
+  const [pipelineAdapterConfig, setPipelineAdapterConfig] =
+    useState<PipelineAdapterConfig | null>(null);
   const videoQuery = useVideo(videoId, isAuthenticated);
   const analysesQuery = useVideoAnalyses(videoId, isAuthenticated);
   const triggerAnalysis = useTriggerVideoAnalysis(videoId);
@@ -68,7 +72,12 @@ function VideoDetail({ videoId }: { videoId: string }): JSX.Element {
           </label>
           <button
             type="button"
-            onClick={() => triggerAnalysis.mutate({ shadow: shadowMode })}
+            onClick={() =>
+              triggerAnalysis.mutate({
+                shadow: shadowMode,
+                pipeline_adapter_config: shadowMode ? pipelineAdapterConfig : null,
+              })
+            }
             disabled={triggerAnalysis.isPending || video.status !== "ready"}
             className="rounded-full bg-brand-primary px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
           >
@@ -81,6 +90,10 @@ function VideoDetail({ videoId }: { videoId: string }): JSX.Element {
         as non-official (e.g. for trying a new model version without affecting a video&apos;s
         canonical score).
       </p>
+      <ShadowAdapterPanel
+        enabled={shadowMode}
+        onConfigChange={setPipelineAdapterConfig}
+      />
 
       {analysesQuery.isLoading ? (
         <p className="text-sm text-content-dim">Loading...</p>

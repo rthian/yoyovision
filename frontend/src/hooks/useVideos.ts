@@ -12,6 +12,7 @@ import {
   triggerVideoAnalysis,
   uploadVideo,
 } from "@/lib/api-client";
+import type { PipelineAdapterConfig } from "@/lib/types";
 
 export const videosQueryKey = ["videos"] as const;
 export const videoQueryKey = (videoId: string) => ["videos", videoId] as const;
@@ -75,7 +76,10 @@ export function useDeleteVideo() {
 export function useTriggerVideoAnalysis(videoId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (options?: { shadow?: boolean }) => triggerVideoAnalysis(videoId, options),
+    mutationFn: (options?: {
+      shadow?: boolean;
+      pipeline_adapter_config?: PipelineAdapterConfig | null;
+    }) => triggerVideoAnalysis(videoId, options),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: videoAnalysesQueryKey(videoId) });
     },
