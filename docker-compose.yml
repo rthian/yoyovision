@@ -102,6 +102,7 @@ services:
       - ./workers:/app/workers
       - ./ml:/app/ml
       - storage_data:/data/storage
+      - ${MODELS_HOST_DIR:-./models}:/models:ro
     command: >
       celery -A yoyovision_workers.celery_app worker
       -Q cpu -n cpu-worker@%h --loglevel=info
@@ -121,6 +122,7 @@ services:
       - ./workers:/app/workers
       - ./ml:/app/ml
       - storage_data:/data/storage
+      - ${MODELS_HOST_DIR:-./models}:/models:ro
     command: >
       celery -A yoyovision_workers.celery_app worker
       -Q gpu -n gpu-worker@%h --loglevel=info --concurrency=1

@@ -48,6 +48,7 @@ annotations — not real footage). See
 annotator-facing guide. Submitted reviews can be appended to an on-disk corpus
 via `POST /analyses/{id}/export/corpus` (`DATASET_CORPUS_ROOT`). Use
 `ml/scripts/prepare_training_corpus.py` to validate, run perception, and train.
+Place trained checkpoints under `./models/` (mounted at `/models` in workers) and pick a shadow preset on the video page.
 
 ## Perception pipeline (pose, hand, yo-yo detection/tracking)
 
