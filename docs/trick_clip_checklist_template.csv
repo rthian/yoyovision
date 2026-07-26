@@ -1,0 +1,4 @@
+clip_filename,video_id,player_id,trick_label,family,outcome,difficulty_band,start_ms,end_ms,routine_start_ms,routine_end_ms,analysis_submitted,added_to_corpus,in_train_split,notes
+trapeze_001.mp4,,,basic_mount,mount,success,basic,500,3500,300,3800,N,N,train,Example row — replace with your clip; delete before use
+double_or_nothing_001.mp4,,,double_or_nothing,whip_catch,success,intermediate,800,4200,500,4500,N,N,train,Example row — side camera
+eli_hop_001.mp4,,,eli_hop,hop,success,basic,600,2800,400,3000,N,N,holdout,Example row — reserve for eval only
