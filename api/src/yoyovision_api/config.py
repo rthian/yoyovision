@@ -53,6 +53,9 @@ class Settings(BaseSettings):
     #: `ml/scripts/prepare_training_corpus.py`. Unset disables corpus append.
     dataset_corpus_root: str | None = None
 
+    #: Base URL for private judge invite links (no trailing slash).
+    judge_invite_base_url: str = "http://localhost:3000/judge"
+
     @property
     def cors_origins_list(self) -> list[str]:
         return [origin.strip() for origin in self.api_cors_origins.split(",") if origin.strip()]

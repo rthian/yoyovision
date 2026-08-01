@@ -24,6 +24,7 @@ from yoyovision_api.auth import create_access_token, hash_password
 from yoyovision_api.config import Settings, get_settings
 from yoyovision_api.db import Base, get_db_session
 from yoyovision_api.db_models import User
+from yoyovision_api.judging_enums import UserRole
 from yoyovision_api.deps import get_storage
 from yoyovision_api.main import create_app
 
@@ -102,4 +103,23 @@ async def test_user(db_session: AsyncSession) -> User:
 @pytest.fixture
 def auth_headers(test_user: User, test_settings: Settings) -> dict[str, str]:
     token = create_access_token(test_user.id, test_settings)
+    return {"Authorization": f"Bearer {token}"}
+
+
+@pytest_asyncio.fixture
+async def admin_user(db_session: AsyncSession) -> User:
+    user = User(
+        email="admin@yoyovision.local",
+        hashed_password=hash_password("admin-pass"),
+        role=UserRole.ADMIN,
+    )
+    db_session.add(user)
+    await db_session.commit()
+    await db_session.refresh(user)
+    return user
+
+
+@pytest.fixture
+def admin_headers(admin_user: User, test_settings: Settings) -> dict[str, str]:
+    token = create_access_token(admin_user.id, test_settings)
     return {"Authorization": f"Bearer {token}"}

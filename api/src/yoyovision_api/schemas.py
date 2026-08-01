@@ -6,6 +6,13 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field
 from yoyovision_ml.pipeline_config import PipelineAdapterConfig
+from yoyovision_api.judging_enums import (
+    AggregationMode,
+    AiMixProfile,
+    JudgeAssignmentStatus,
+    JudgingEntryMode,
+    JudgingEntryStatus,
+)
 from yoyovision_ml.domain import (
     AnalysisReviewState,
     DeductionType,
@@ -260,3 +267,89 @@ class CorpusExportRead(BaseModel):
     record_path: str
     corpus_root: str
     video_path: str
+
+
+# --- Multi-judge entries (Phase B) ---
+
+
+class JudgingEntryCreate(BaseModel):
+    title: str = Field(min_length=1, max_length=255)
+    mode: JudgingEntryMode
+    ruleset_version: str | None = None
+    ai_mix_profile: AiMixProfile = AiMixProfile.COMPARE_ONLY
+    aggregation_mode: AggregationMode = AggregationMode.AUTO
+    due_at: datetime | None = None
+    video_ids: list[str] = Field(min_length=1)
+
+
+class JudgingEntryUpdate(BaseModel):
+    title: str | None = Field(default=None, min_length=1, max_length=255)
+    mode: JudgingEntryMode | None = None
+    status: JudgingEntryStatus | None = None
+    ruleset_version: str | None = None
+    ai_mix_profile: AiMixProfile | None = None
+    aggregation_mode: AggregationMode | None = None
+    due_at: datetime | None = None
+    clear_due_at: bool = False
+
+
+class JudgingEntryVideoAttach(BaseModel):
+    video_ids: list[str] = Field(min_length=1)
+
+
+class JudgingEntryVideoAnalysisLink(BaseModel):
+    official_analysis_id: str | None = None
+    shadow_analysis_id: str | None = None
+
+
+class JudgeAssignmentCreate(BaseModel):
+    display_name: str = Field(min_length=1, max_length=128)
+    include_in_results: bool = True
+    is_shadow: bool = False
+
+
+class JudgeInviteRead(BaseModel):
+    assignment_id: str
+    display_name: str
+    token_prefix: str
+    invite_url: str
+    share_message: str
+    token_expires_at: datetime
+    include_in_results: bool
+    is_shadow: bool
+    status: JudgeAssignmentStatus
+
+
+class JudgeAssignmentSummary(BaseModel):
+    id: str
+    display_name: str
+    token_prefix: str
+    token_expires_at: datetime
+    include_in_results: bool
+    is_shadow: bool
+    revoked_at: datetime | None
+    status: JudgeAssignmentStatus
+
+
+class JudgingEntryVideoRead(BaseModel):
+    id: str
+    video_id: str
+    sort_order: int
+    original_filename: str
+    official_analysis_id: str | None
+    shadow_analysis_id: str | None
+
+
+class JudgingEntryRead(BaseModel):
+    id: str
+    title: str
+    mode: JudgingEntryMode
+    status: JudgingEntryStatus
+    ruleset_version: str
+    ai_mix_profile: AiMixProfile
+    aggregation_mode: AggregationMode
+    due_at: datetime | None
+    created_at: datetime
+    updated_at: datetime
+    videos: list[JudgingEntryVideoRead]
+    judges: list[JudgeAssignmentSummary]

@@ -17,6 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from yoyovision_api.config import Settings
 from yoyovision_api.db_models import User
+from yoyovision_api.judging_enums import UserRole
 
 _pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
@@ -71,10 +72,15 @@ async def ensure_dev_seed_user(session: AsyncSession, settings: Settings) -> Use
     )
     user = result.scalar_one_or_none()
     if user is not None:
+        if user.role != UserRole.ADMIN:
+            user.role = UserRole.ADMIN
+            await session.commit()
+            await session.refresh(user)
         return user
     user = User(
         email=settings.auth_dev_seed_user_email,
         hashed_password=hash_password(settings.auth_dev_seed_user_password),
+        role=UserRole.ADMIN,
     )
     session.add(user)
     await session.commit()

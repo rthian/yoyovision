@@ -10,7 +10,7 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import JSON, Boolean, DateTime, Float, ForeignKey, Integer, String, func
+from sqlalchemy import JSON, Boolean, DateTime, Float, ForeignKey, Integer, String, UniqueConstraint, func
 from sqlalchemy import Enum as SAEnum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from yoyovision_ml.domain import (
@@ -27,6 +27,13 @@ from yoyovision_ml.domain import (
 )
 
 from yoyovision_api.db import Base
+from yoyovision_api.judging_enums import (
+    AggregationMode,
+    AiMixProfile,
+    JudgingEntryMode,
+    JudgingEntryStatus,
+    UserRole,
+)
 
 
 def _uuid() -> str:
@@ -57,6 +64,9 @@ class User(Base):
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
     email: Mapped[str] = mapped_column(String(255), unique=True, index=True, nullable=False)
     hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)
+    role: Mapped[UserRole] = mapped_column(
+        _str_enum(UserRole, 16), nullable=False, default=UserRole.USER
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
@@ -263,3 +273,114 @@ class ScoreBreakdownORM(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     analysis: Mapped[AnalysisJobORM] = relationship(back_populates="score_breakdown")
+
+
+class JudgingEntryORM(Base):
+    __tablename__ = "judging_entries"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+    mode: Mapped[JudgingEntryMode] = mapped_column(_str_enum(JudgingEntryMode, 16), nullable=False)
+    status: Mapped[JudgingEntryStatus] = mapped_column(
+        _str_enum(JudgingEntryStatus, 16), nullable=False, default=JudgingEntryStatus.DRAFT
+    )
+    ruleset_version: Mapped[str] = mapped_column(String(32), nullable=False)
+    ai_mix_profile: Mapped[AiMixProfile] = mapped_column(
+        _str_enum(AiMixProfile, 8), nullable=False, default=AiMixProfile.COMPARE_ONLY
+    )
+    aggregation_mode: Mapped[AggregationMode] = mapped_column(
+        _str_enum(AggregationMode, 16), nullable=False, default=AggregationMode.AUTO
+    )
+    created_by: Mapped[str] = mapped_column(
+        String(36), ForeignKey("users.id"), index=True, nullable=False
+    )
+    due_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+    videos: Mapped[list[JudgingEntryVideoORM]] = relationship(
+        back_populates="entry", cascade="all, delete-orphan", order_by="JudgingEntryVideoORM.sort_order"
+    )
+    judges: Mapped[list[JudgeAssignmentORM]] = relationship(
+        back_populates="entry", cascade="all, delete-orphan"
+    )
+
+
+class JudgingEntryVideoORM(Base):
+    __tablename__ = "judging_entry_videos"
+    __table_args__ = (UniqueConstraint("entry_id", "video_id", name="uq_judging_entry_video"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    entry_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("judging_entries.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    video_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("video_assets.id"), nullable=False
+    )
+    sort_order: Mapped[int] = mapped_column(Integer, nullable=False)
+    official_analysis_id: Mapped[str | None] = mapped_column(
+        String(36), ForeignKey("analysis_jobs.id"), nullable=True
+    )
+    shadow_analysis_id: Mapped[str | None] = mapped_column(
+        String(36), ForeignKey("analysis_jobs.id"), nullable=True
+    )
+
+    entry: Mapped[JudgingEntryORM] = relationship(back_populates="videos")
+    video: Mapped[VideoAssetORM] = relationship()
+    official_analysis: Mapped[AnalysisJobORM | None] = relationship(
+        foreign_keys=[official_analysis_id]
+    )
+    shadow_analysis: Mapped[AnalysisJobORM | None] = relationship(foreign_keys=[shadow_analysis_id])
+
+
+class JudgeAssignmentORM(Base):
+    __tablename__ = "judge_assignments"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    entry_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("judging_entries.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    display_name: Mapped[str] = mapped_column(String(128), nullable=False)
+    invite_token_hash: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
+    token_prefix: Mapped[str] = mapped_column(String(16), nullable=False)
+    token_expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    include_in_results: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    is_shadow: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    entry: Mapped[JudgingEntryORM] = relationship(back_populates="judges")
+    freestyle_scores: Mapped[list[JudgeFreestyleScoreORM]] = relationship(
+        back_populates="assignment", cascade="all, delete-orphan"
+    )
+
+
+class JudgeFreestyleScoreORM(Base):
+    __tablename__ = "judge_freestyle_scores"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    assignment_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("judge_assignments.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    entry_video_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("judging_entry_videos.id", ondelete="CASCADE"), nullable=False
+    )
+    execution: Mapped[float | None] = mapped_column(Float, nullable=True)
+    control: Mapped[float | None] = mapped_column(Float, nullable=True)
+    trick_diversity: Mapped[float | None] = mapped_column(Float, nullable=True)
+    space_use_emphasis: Mapped[float | None] = mapped_column(Float, nullable=True)
+    music_choreography: Mapped[float | None] = mapped_column(Float, nullable=True)
+    music_construction: Mapped[float | None] = mapped_column(Float, nullable=True)
+    body_control: Mapped[float | None] = mapped_column(Float, nullable=True)
+    showmanship: Mapped[float | None] = mapped_column(Float, nullable=True)
+    notes: Mapped[str] = mapped_column(String(4096), nullable=False, default="")
+    is_submitted: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    submitted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+    assignment: Mapped[JudgeAssignmentORM] = relationship(back_populates="freestyle_scores")
+    entry_video: Mapped[JudgingEntryVideoORM] = relationship()
