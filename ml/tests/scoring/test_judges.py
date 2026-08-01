@@ -160,3 +160,54 @@ def test_match_clicks_to_events_ignores_outcome_and_still_matches_misses() -> No
     clicks = [make_judge_click(timestamp_ms=1000)]
     matches = match_clicks_to_events(clicks, events)
     assert matches[0].matched_event_label == "mount_1"
+
+
+def test_trim_1_drops_high_and_low() -> None:
+    scores = [
+        make_judge_score(judge_id="a", execution=1.0),
+        make_judge_score(judge_id="b", execution=5.0),
+        make_judge_score(judge_id="c", execution=9.0),
+    ]
+    evaluation, warnings = aggregate_judge_scores(scores, mode="trim_1")
+    assert evaluation.execution == 5.0
+    assert not any("using simple mean" in w for w in warnings)
+
+
+def test_trim_1_falls_back_when_only_two_values() -> None:
+    scores = [
+        make_judge_score(judge_id="a", execution=4.0),
+        make_judge_score(judge_id="b", execution=8.0),
+    ]
+    evaluation, warnings = aggregate_judge_scores(scores, mode="trim_1")
+    assert evaluation.execution == 6.0
+    assert any("using simple mean" in w for w in warnings)
+
+
+def test_trim_2_drops_two_from_each_end() -> None:
+    scores = [
+        make_judge_score(judge_id="a", execution=1.0),
+        make_judge_score(judge_id="b", execution=2.0),
+        make_judge_score(judge_id="c", execution=5.0),
+        make_judge_score(judge_id="d", execution=8.0),
+        make_judge_score(judge_id="e", execution=9.0),
+    ]
+    evaluation, _ = aggregate_judge_scores(scores, mode="trim_2")
+    assert evaluation.execution == 5.0
+
+
+def test_auto_uses_trim_1_for_five_values() -> None:
+    scores = [
+        make_judge_score(judge_id=f"j{i}", execution=float(i))
+        for i in range(1, 6)
+    ]
+    evaluation, _ = aggregate_judge_scores(scores, mode="auto")
+    assert evaluation.execution == 3.0
+
+
+def test_auto_uses_trim_2_for_seven_values() -> None:
+    scores = [
+        make_judge_score(judge_id=f"j{i}", execution=float(i))
+        for i in range(1, 8)
+    ]
+    evaluation, _ = aggregate_judge_scores(scores, mode="auto")
+    assert evaluation.execution == 4.0

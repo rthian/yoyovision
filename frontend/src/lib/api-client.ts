@@ -33,6 +33,7 @@ import type {
   JudgingEntryMode,
   JudgingEntryRead,
   JudgingEntryStatus,
+  JudgingEntryResultsRead,
 } from "@/lib/types";
 
 const API_BASE_URL =
@@ -547,7 +548,13 @@ export function getJudgingEntry(entryId: string): Promise<JudgingEntryRead> {
 
 export function updateJudgingEntry(
   entryId: string,
-  payload: Partial<{ title: string; mode: JudgingEntryMode; status: JudgingEntryStatus }>
+  payload: Partial<{
+    title: string;
+    mode: JudgingEntryMode;
+    status: JudgingEntryStatus;
+    ai_mix_profile: string;
+    aggregation_mode: string;
+  }>
 ): Promise<JudgingEntryRead> {
   return request<JudgingEntryRead>(`/judging-entries/${entryId}`, {
     method: "PATCH",
@@ -573,6 +580,10 @@ export function rotateJudgeInvite(
     `/judging-entries/${entryId}/judges/${assignmentId}/rotate`,
     { method: "POST" }
   );
+}
+
+export function getJudgingEntryResults(entryId: string): Promise<JudgingEntryResultsRead> {
+  return request<JudgingEntryResultsRead>(`/judging-entries/${entryId}/results`);
 }
 
 export function revokeJudgeInvite(entryId: string, assignmentId: string): Promise<void> {

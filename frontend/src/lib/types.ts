@@ -457,3 +457,65 @@ export interface JudgeInviteRead {
   is_shadow: boolean;
   status: JudgeAssignmentStatus;
 }
+
+export interface FeCategoryScores {
+  execution: number | null;
+  control: number | null;
+  trick_diversity: number | null;
+  space_use_emphasis: number | null;
+  music_choreography: number | null;
+  music_construction: number | null;
+  body_control: number | null;
+  showmanship: number | null;
+}
+
+export interface JudgeResultRow {
+  assignment_id: string;
+  display_name: string;
+  include_in_results: boolean;
+  is_shadow: boolean;
+  is_submitted: boolean;
+  included_in_aggregate: boolean;
+  scores: FeCategoryScores;
+  notes: string;
+}
+
+export interface VideoResults {
+  entry_video_id: string;
+  video_id: string;
+  sort_order: number;
+  original_filename: string;
+  official_analysis_id: string | null;
+  shadow_analysis_id: string | null;
+  judges: JudgeResultRow[];
+  panel_aggregate: FeCategoryScores;
+  human_aggregate: FeCategoryScores;
+  ai_fe: FeCategoryScores | null;
+  shadow_fe: FeCategoryScores | null;
+  ai_filled_categories: string[];
+  ai_virtual_judge_included: boolean;
+  effective_aggregation_mode: string;
+  warnings: string[];
+}
+
+export interface JudgingEntryResultsRead {
+  entry_id: string;
+  title: string;
+  mode: JudgingEntryMode;
+  status: JudgingEntryStatus;
+  ai_mix_profile: string;
+  aggregation_mode: string;
+  videos: VideoResults[];
+  warnings: string[];
+}
+
+export const FE_CATEGORY_COLUMNS: { key: keyof FeCategoryScores; label: string }[] = [
+  { key: "execution", label: "Exec" },
+  { key: "control", label: "Ctrl" },
+  { key: "trick_diversity", label: "Div" },
+  { key: "space_use_emphasis", label: "Space" },
+  { key: "music_choreography", label: "Choreo" },
+  { key: "music_construction", label: "Music" },
+  { key: "body_control", label: "Body" },
+  { key: "showmanship", label: "Show" },
+];

@@ -406,3 +406,57 @@ class JudgeAccessRead(BaseModel):
     due_at: datetime | None
     token_expires_at: datetime
     videos: list[JudgeAccessVideoRead]
+
+
+# --- Judging entry results (Phase D) ---
+
+
+class FeCategoryScores(BaseModel):
+    execution: float | None = None
+    control: float | None = None
+    trick_diversity: float | None = None
+    space_use_emphasis: float | None = None
+    music_choreography: float | None = None
+    music_construction: float | None = None
+    body_control: float | None = None
+    showmanship: float | None = None
+
+
+class JudgeResultRow(BaseModel):
+    assignment_id: str
+    display_name: str
+    include_in_results: bool
+    is_shadow: bool
+    is_submitted: bool
+    included_in_aggregate: bool
+    scores: FeCategoryScores
+    notes: str
+
+
+class VideoResults(BaseModel):
+    entry_video_id: str
+    video_id: str
+    sort_order: int
+    original_filename: str
+    official_analysis_id: str | None
+    shadow_analysis_id: str | None
+    judges: list[JudgeResultRow]
+    panel_aggregate: FeCategoryScores
+    human_aggregate: FeCategoryScores
+    ai_fe: FeCategoryScores | None
+    shadow_fe: FeCategoryScores | None
+    ai_filled_categories: list[str]
+    ai_virtual_judge_included: bool
+    effective_aggregation_mode: str
+    warnings: list[str]
+
+
+class JudgingEntryResultsRead(BaseModel):
+    entry_id: str
+    title: str
+    mode: JudgingEntryMode
+    status: JudgingEntryStatus
+    ai_mix_profile: AiMixProfile
+    aggregation_mode: AggregationMode
+    videos: list[VideoResults]
+    warnings: list[str]

@@ -5,11 +5,13 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { AuthGate } from "@/components/AuthGate";
 import { JudgeInviteShareModal } from "@/components/JudgeInviteShareModal";
+import { JudgingEntryResults } from "@/components/JudgingEntryResults";
 import {
   addJudgeToEntry,
   getJudgingEntry,
   revokeJudgeInvite,
   rotateJudgeInvite,
+  updateJudgingEntry,
 } from "@/lib/api-client";
 import type { JudgeInviteRead } from "@/lib/types";
 
@@ -40,6 +42,15 @@ function EntryDetail({ entryId }: { entryId: string }): JSX.Element {
     onSuccess: (invite) => setShareInvite(invite),
   });
 
+  const profileMutation = useMutation({
+    mutationFn: (payload: { ai_mix_profile?: string; aggregation_mode?: string }) =>
+      updateJudgingEntry(entryId, payload),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["judgingEntry", entryId] });
+      void queryClient.invalidateQueries({ queryKey: ["judgingEntryResults", entryId] });
+    },
+  });
+
   const revokeMutation = useMutation({
     mutationFn: (assignmentId: string) => revokeJudgeInvite(entryId, assignmentId),
     onSuccess: () => {
@@ -63,6 +74,35 @@ function EntryDetail({ entryId }: { entryId: string }): JSX.Element {
         <p className="text-sm text-content-dim">
           {entry.mode} · {entry.status} · {entry.videos.length} videos
         </p>
+        <div className="mt-3 flex flex-wrap gap-3">
+          <label className="flex flex-col gap-1 text-xs text-content-dim">
+            AI profile
+            <select
+              value={entry.ai_mix_profile}
+              disabled={profileMutation.isPending}
+              onChange={(e) => profileMutation.mutate({ ai_mix_profile: e.target.value })}
+              className="h-9 rounded-s border border-outline-default px-2 text-sm"
+            >
+              <option value="A">A — Compare only</option>
+              <option value="B">B — Gap-fill</option>
+              <option value="C">C — AI virtual judge</option>
+            </select>
+          </label>
+          <label className="flex flex-col gap-1 text-xs text-content-dim">
+            Aggregation
+            <select
+              value={entry.aggregation_mode}
+              disabled={profileMutation.isPending}
+              onChange={(e) => profileMutation.mutate({ aggregation_mode: e.target.value })}
+              className="h-9 rounded-s border border-outline-default px-2 text-sm"
+            >
+              <option value="auto">Auto</option>
+              <option value="simple_mean">Simple mean</option>
+              <option value="trim_1">Trim 1</option>
+              <option value="trim_2">Trim 2</option>
+            </select>
+          </label>
+        </div>
       </header>
 
       <section>
@@ -148,6 +188,8 @@ function EntryDetail({ entryId }: { entryId: string }): JSX.Element {
           })}
         </ul>
       </section>
+
+      <JudgingEntryResults entryId={entryId} />
 
       {shareInvite ? (
         <JudgeInviteShareModal

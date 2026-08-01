@@ -7,6 +7,7 @@ model-vs-judge statistics live in `scoring.calibration`.
 from __future__ import annotations
 
 from collections.abc import Sequence
+from typing import Literal
 from dataclasses import dataclass
 
 from yoyovision_ml.domain import AnalysisEventPrediction, FreestyleEvaluation, Source
@@ -31,9 +32,54 @@ FE_CATEGORIES: tuple[str, ...] = (
 #: Freestyle Evaluation scale.
 _DISAGREEMENT_THRESHOLD = 3.0
 
+AggregationModeName = Literal["simple_mean", "trim_1", "trim_2", "auto"]
+EffectiveAggregationMode = Literal["simple_mean", "trim_1", "trim_2"]
+
+
+def _resolve_auto_mode(count: int) -> EffectiveAggregationMode:
+    if count < 5:
+        return "simple_mean"
+    if count <= 6:
+        return "trim_1"
+    return "trim_2"
+
+
+def _trimmed_mean(values: list[float], drop: int) -> float:
+    sorted_values = sorted(values)
+    trimmed = sorted_values[drop:-drop] if drop else sorted_values
+    return sum(trimmed) / len(trimmed)
+
+
+def _aggregate_category_values(
+    category: str,
+    values: list[float],
+    mode: AggregationModeName,
+) -> tuple[float, list[str]]:
+    warnings: list[str] = []
+    effective: EffectiveAggregationMode = (
+        _resolve_auto_mode(len(values)) if mode == "auto" else mode
+    )
+    if effective == "simple_mean":
+        return sum(values) / len(values), warnings
+    if effective == "trim_1":
+        if len(values) >= 3:
+            return _trimmed_mean(values, 1), warnings
+        warnings.append(
+            f"trim_1 requested for '{category}' but only {len(values)} value(s); using simple mean."
+        )
+        return sum(values) / len(values), warnings
+    if len(values) >= 5:
+        return _trimmed_mean(values, 2), warnings
+    warnings.append(
+        f"trim_2 requested for '{category}' but only {len(values)} value(s); using simple mean."
+    )
+    return sum(values) / len(values), warnings
+
 
 def aggregate_judge_scores(
     scores: Sequence[JudgeFreestyleScore],
+    *,
+    mode: AggregationModeName = "simple_mean",
 ) -> tuple[FreestyleEvaluation, list[str]]:
     """Reduces multiple judges' Freestyle Evaluation entries into the single
     `FreestyleEvaluation` `scoring_engine.DeterministicScoringEngine`
@@ -64,7 +110,9 @@ def aggregate_judge_scores(
             aggregated[category] = None
             warnings.append(f"No judge entered a '{category}' score.")
             continue
-        aggregated[category] = sum(values) / len(values)
+        category_value, category_warnings = _aggregate_category_values(category, values, mode)
+        aggregated[category] = category_value
+        warnings.extend(category_warnings)
         if len(values) > 1 and (max(values) - min(values)) >= _DISAGREEMENT_THRESHOLD:
             warnings.append(
                 f"Judges disagree on '{category}' (range "
@@ -76,7 +124,7 @@ def aggregate_judge_scores(
     evaluation = FreestyleEvaluation(
         **aggregated,
         source=Source.HUMAN,
-        notes=f"averaged across {len(scores)} judge score(s): {judge_ids}",
+        notes=f"aggregated ({mode}) across {len(scores)} judge score(s): {judge_ids}",
     )
     return evaluation, warnings
 

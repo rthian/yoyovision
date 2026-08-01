@@ -19,8 +19,9 @@ from yoyovision_api.schemas import (
     JudgingEntryVideoAnalysisLink,
     JudgingEntryVideoAttach,
     JudgingEntryVideoRead,
+    JudgingEntryResultsRead,
 )
-from yoyovision_api.services import judging_service
+from yoyovision_api.services import judging_results_service, judging_service
 
 router = APIRouter(prefix="/judging-entries", tags=["judging-entries"])
 
@@ -126,6 +127,24 @@ async def get_judging_entry(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     return _entry_to_read(entry)
 
+
+
+
+@router.get("/{entry_id}/results", response_model=JudgingEntryResultsRead)
+async def get_judging_entry_results(
+    entry_id: str,
+    session: DbSession,
+    admin: CurrentAdmin,
+) -> JudgingEntryResultsRead:
+    try:
+        return await judging_results_service.compute_entry_results(session, entry_id)
+    except judging_service.JudgingServiceError as exc:
+        status_code = (
+            status.HTTP_404_NOT_FOUND
+            if "not found" in str(exc).lower()
+            else status.HTTP_422_UNPROCESSABLE_ENTITY
+        )
+        raise HTTPException(status_code=status_code, detail=str(exc)) from exc
 
 @router.patch("/{entry_id}", response_model=JudgingEntryRead)
 async def update_judging_entry(
