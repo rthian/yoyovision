@@ -359,6 +359,9 @@ class JudgeAssignmentORM(Base):
 
 class JudgeFreestyleScoreORM(Base):
     __tablename__ = "judge_freestyle_scores"
+    __table_args__ = (
+        UniqueConstraint("assignment_id", "entry_video_id", name="uq_judge_fe_assignment_video"),
+    )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
     assignment_id: Mapped[str] = mapped_column(

@@ -29,6 +29,7 @@ from yoyovision_api.routers import (
     evaluations,
     events,
     exports,
+    judge_access,
     judging_entries,
     rulesets,
     videos,
@@ -113,6 +114,7 @@ def create_app() -> FastAPI:
     app.include_router(exports.router)
     app.include_router(rulesets.router)
     app.include_router(judging_entries.router)
+    app.include_router(judge_access.router)
 
     return app
 

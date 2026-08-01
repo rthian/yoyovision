@@ -353,3 +353,56 @@ class JudgingEntryRead(BaseModel):
     updated_at: datetime
     videos: list[JudgingEntryVideoRead]
     judges: list[JudgeAssignmentSummary]
+
+
+# --- Judge access (Phase C) ---
+
+
+class JudgeFreestyleScoreRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    execution: float | None
+    control: float | None
+    trick_diversity: float | None
+    space_use_emphasis: float | None
+    music_choreography: float | None
+    music_construction: float | None
+    body_control: float | None
+    showmanship: float | None
+    notes: str
+    is_submitted: bool
+    submitted_at: datetime | None
+    updated_at: datetime
+
+
+class JudgeFreestyleScoreUpsert(BaseModel):
+    execution: float | None = Field(default=None, ge=0.0, le=10.0)
+    control: float | None = Field(default=None, ge=0.0, le=10.0)
+    trick_diversity: float | None = Field(default=None, ge=0.0, le=10.0)
+    space_use_emphasis: float | None = Field(default=None, ge=0.0, le=10.0)
+    music_choreography: float | None = Field(default=None, ge=0.0, le=10.0)
+    music_construction: float | None = Field(default=None, ge=0.0, le=10.0)
+    body_control: float | None = Field(default=None, ge=0.0, le=10.0)
+    showmanship: float | None = Field(default=None, ge=0.0, le=10.0)
+    notes: str = Field(default="", max_length=4096)
+
+
+class JudgeAccessVideoRead(BaseModel):
+    entry_video_id: str
+    sort_order: int
+    original_filename: str
+    duration_ms: int | None
+    mime_type: str | None
+    my_score: JudgeFreestyleScoreRead | None
+
+
+class JudgeAccessRead(BaseModel):
+    assignment_id: str
+    display_name: str
+    entry_id: str
+    entry_title: str
+    entry_mode: JudgingEntryMode
+    entry_status: JudgingEntryStatus
+    due_at: datetime | None
+    token_expires_at: datetime
+    videos: list[JudgeAccessVideoRead]

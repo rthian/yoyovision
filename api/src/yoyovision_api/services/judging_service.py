@@ -24,15 +24,40 @@ from yoyovision_api.judging_enums import (
     JudgingEntryMode,
     JudgingEntryStatus,
 )
+from yoyovision_api.schemas import JudgeFreestyleScoreUpsert
 from yoyovision_api.services.invite_token import (
     generate_invite_token,
+    hash_token,
     is_token_active,
     token_expires_at,
+)
+
+FE_SCORE_FIELDS = (
+    "execution",
+    "control",
+    "trick_diversity",
+    "space_use_emphasis",
+    "music_choreography",
+    "music_construction",
+    "body_control",
+    "showmanship",
 )
 
 
 class JudgingServiceError(ValueError):
     """Raised when a judging entry operation is invalid."""
+
+
+class InviteInvalidError(JudgingServiceError):
+    """Unknown invite token."""
+
+
+class InviteInactiveError(JudgingServiceError):
+    """Expired or revoked invite token."""
+
+
+class JudgingAccessError(JudgingServiceError):
+    """Judge cannot access or modify this resource."""
 
 
 def _assignment_status(assignment: JudgeAssignmentORM) -> JudgeAssignmentStatus:
@@ -57,6 +82,37 @@ def _assignment_status(assignment: JudgeAssignmentORM) -> JudgeAssignmentStatus:
     ):
         return JudgeAssignmentStatus.IN_PROGRESS
     return JudgeAssignmentStatus.PENDING
+
+
+def _assert_entry_readable(entry: JudgingEntryORM) -> None:
+    if entry.status == JudgingEntryStatus.DRAFT:
+        raise JudgingAccessError("This judging entry is not open yet.")
+
+
+def _assert_entry_writable(entry: JudgingEntryORM) -> None:
+    if entry.status == JudgingEntryStatus.DRAFT:
+        raise JudgingAccessError("This judging entry is not open yet.")
+    if entry.status == JudgingEntryStatus.LOCKED:
+        raise JudgingAccessError("This judging entry is locked.")
+
+
+def _score_for_video(
+    assignment: JudgeAssignmentORM, entry_video_id: str
+) -> JudgeFreestyleScoreORM | None:
+    for score in assignment.freestyle_scores:
+        if score.entry_video_id == entry_video_id:
+            return score
+    return None
+
+
+def _apply_fe_payload(score: JudgeFreestyleScoreORM, payload: JudgeFreestyleScoreUpsert) -> None:
+    for field in FE_SCORE_FIELDS:
+        setattr(score, field, getattr(payload, field))
+    score.notes = payload.notes
+
+
+def _all_fe_fields_present(score: JudgeFreestyleScoreORM) -> bool:
+    return all(getattr(score, field) is not None for field in FE_SCORE_FIELDS)
 
 
 async def create_entry(
@@ -275,26 +331,96 @@ async def revoke_judge(session: AsyncSession, assignment: JudgeAssignmentORM) ->
 async def resolve_assignment_by_token(
     session: AsyncSession, raw_token: str
 ) -> JudgeAssignmentORM:
-    from yoyovision_api.services.invite_token import hash_token
-
     token_hash = hash_token(raw_token)
     result = await session.execute(
         select(JudgeAssignmentORM)
         .where(JudgeAssignmentORM.invite_token_hash == token_hash)
         .options(
-            selectinload(JudgeAssignmentORM.entry).selectinload(JudgingEntryORM.videos),
+            selectinload(JudgeAssignmentORM.entry)
+            .selectinload(JudgingEntryORM.videos)
+            .selectinload(JudgingEntryVideoORM.video),
             selectinload(JudgeAssignmentORM.freestyle_scores),
         )
     )
     assignment = result.scalar_one_or_none()
     if assignment is None:
-        raise JudgingServiceError("Invalid invite link.")
+        raise InviteInvalidError("Invalid invite link.")
     if not is_token_active(
         token_expires_at=assignment.token_expires_at,
         revoked_at=assignment.revoked_at,
     ):
-        raise JudgingServiceError("Invite link has expired or been revoked.")
+        raise InviteInactiveError(
+            "Invite link has expired or been revoked. Ask your admin for a new link."
+        )
     return assignment
+
+
+async def get_entry_video_for_assignment(
+    assignment: JudgeAssignmentORM, entry_video_id: str
+) -> JudgingEntryVideoORM:
+    for entry_video in assignment.entry.videos:
+        if entry_video.id == entry_video_id:
+            return entry_video
+    raise JudgingAccessError("Video not found.")
+
+
+async def upsert_judge_fe(
+    session: AsyncSession,
+    assignment: JudgeAssignmentORM,
+    entry_video_id: str,
+    payload: JudgeFreestyleScoreUpsert,
+) -> JudgeFreestyleScoreORM:
+    _assert_entry_writable(assignment.entry)
+    await get_entry_video_for_assignment(assignment, entry_video_id)
+
+    score = _score_for_video(assignment, entry_video_id)
+    if score is not None and score.is_submitted:
+        raise JudgingAccessError("Scores already submitted.")
+
+    if score is None:
+        score = JudgeFreestyleScoreORM(
+            assignment_id=assignment.id,
+            entry_video_id=entry_video_id,
+        )
+        session.add(score)
+        assignment.freestyle_scores.append(score)
+
+    _apply_fe_payload(score, payload)
+    await session.commit()
+    await session.refresh(score)
+    return score
+
+
+async def submit_judge_fe(
+    session: AsyncSession,
+    assignment: JudgeAssignmentORM,
+    entry_video_id: str,
+    payload: JudgeFreestyleScoreUpsert,
+) -> JudgeFreestyleScoreORM:
+    _assert_entry_writable(assignment.entry)
+    await get_entry_video_for_assignment(assignment, entry_video_id)
+
+    score = _score_for_video(assignment, entry_video_id)
+    if score is not None and score.is_submitted:
+        raise JudgingAccessError("Scores already submitted.")
+
+    if score is None:
+        score = JudgeFreestyleScoreORM(
+            assignment_id=assignment.id,
+            entry_video_id=entry_video_id,
+        )
+        session.add(score)
+        assignment.freestyle_scores.append(score)
+
+    _apply_fe_payload(score, payload)
+    if not _all_fe_fields_present(score):
+        raise JudgingAccessError("All freestyle fields are required to submit.")
+
+    score.is_submitted = True
+    score.submitted_at = datetime.now(UTC)
+    await session.commit()
+    await session.refresh(score)
+    return score
 
 
 def build_invite_url(base_url: str, raw_token: str) -> str:
