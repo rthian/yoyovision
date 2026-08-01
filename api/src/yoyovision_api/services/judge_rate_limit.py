@@ -21,3 +21,8 @@ def check_judge_rate_limit(key: str, *, limit_per_minute: int) -> None:
     if len(bucket) >= limit_per_minute:
         raise JudgeRateLimitExceeded("Too many requests. Try again shortly.")
     bucket.append(now)
+
+
+def reset_judge_rate_limits() -> None:
+    """Clear in-memory buckets (test helper)."""
+    _buckets.clear()

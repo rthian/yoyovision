@@ -218,6 +218,17 @@ Nothing in this repository fabricates accuracy numbers or claims trained
 weights that do not exist. See [`docs/adapters.md`](docs/adapters.md) for
 how a real adapter gets swapped in.
 
+
+## Multi-judge panel judging
+
+Admins can create **judging entries** with multiple videos and invite
+name-only judges via private links (48h expiry, per-judge QR). Judges score
+at `/judge/{token}` without accounts; admins see panel aggregation and AI
+compare on `/admin/judging-entries/[id]`.
+
+- Design: [`docs/multi_judge_entries.md`](docs/multi_judge_entries.md)
+- Operator guide: [`docs/CreatorManual.md`](docs/CreatorManual.md#multi-judge-panel-judging)
+
 ## Local development
 
 ```bash

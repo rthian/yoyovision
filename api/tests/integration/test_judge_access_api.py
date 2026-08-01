@@ -217,3 +217,42 @@ async def test_locked_entry_allows_read_blocks_write(
         json={"execution": 5.0},
     )
     assert write.status_code == 403
+
+
+
+async def test_revoked_token_returns_410_on_judge_access(
+    client: AsyncClient,
+    admin_headers: dict[str, str],
+) -> None:
+    entry_id, _, token = await _open_entry_with_judge(client, admin_headers)
+    assignment_id = (
+        await client.get(f"/judging-entries/{entry_id}", headers=admin_headers)
+    ).json()["judges"][0]["id"]
+    assert (
+        await client.post(
+            f"/judging-entries/{entry_id}/judges/{assignment_id}/revoke",
+            headers=admin_headers,
+        )
+    ).status_code == 204
+
+    response = await client.get(f"/judge-access/{token}")
+    assert response.status_code == 410
+
+
+async def test_judge_rate_limit_returns_429(
+    client: AsyncClient,
+    admin_headers: dict[str, str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from yoyovision_api.services import judge_rate_limit
+
+    judge_rate_limit.reset_judge_rate_limits()
+    monkeypatch.setattr(
+        "yoyovision_api.routers.judge_access.check_judge_rate_limit",
+        lambda key, *, limit_per_minute: judge_rate_limit.check_judge_rate_limit(
+            key, limit_per_minute=1
+        ),
+    )
+    _, _, token = await _open_entry_with_judge(client, admin_headers)
+    assert (await client.get(f"/judge-access/{token}")).status_code == 200
+    assert (await client.get(f"/judge-access/{token}")).status_code == 429
