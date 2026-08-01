@@ -17,7 +17,8 @@ from yoyovision_ml.interfaces import StoragePort
 from yoyovision_api.auth import AuthError, decode_access_token
 from yoyovision_api.config import Settings, get_settings
 from yoyovision_api.db import get_db_session
-from yoyovision_api.db_models import AnalysisJobORM, User, VideoAssetORM
+from yoyovision_api.db_models import AnalysisJobORM, JudgeAssignmentORM, User, VideoAssetORM
+from yoyovision_api.judging_enums import UserRole
 
 _oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
 
@@ -97,3 +98,12 @@ async def get_owned_job(
 
 OwnedVideo = Annotated[VideoAssetORM, Depends(get_owned_video)]
 OwnedJob = Annotated[AnalysisJobORM, Depends(get_owned_job)]
+
+
+async def get_current_admin(current_user: CurrentUser) -> User:
+    if current_user.role != UserRole.ADMIN:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required.")
+    return current_user
+
+
+CurrentAdmin = Annotated[User, Depends(get_current_admin)]

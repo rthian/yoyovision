@@ -340,6 +340,48 @@ as tricks complete during playback (completed tricks only: `end_ms ≤ playhead`
 
 ---
 
+## Multi-judge panel judging
+
+Use **Judging Entries** when several name-only judges score the same routine
+videos in isolation (training panels or informal contests). This is separate
+from the owner **Review** workflow on a single analysis.
+
+### Admin workflow
+
+1. Sign in as an admin user (`role=admin`; the dev seed account is promoted
+   automatically in local dev).
+2. Open **Judging** in the nav → `/admin/judging-entries`.
+3. Create an entry (title, mode, one or more uploaded videos). New entries are
+   opened for judging immediately (`status=open`).
+4. Add judges by display name → copy the **Share** message or show the **QR**
+   code. Each judge gets a unique private link. Raw tokens are shown once; use
+   **Share / QR** (rotate) to re-issue after a refresh.
+5. Optionally link `official_analysis_id` / `shadow_analysis_id` per video via
+   `PATCH /judging-entries/{id}/videos/{entry_video_id}/analyses` so AI
+   Freestyle Evaluation appears in results compare.
+6. Open **Results** on the entry detail page after judges submit. Switch **AI
+   profile** and **aggregation** mode:
+   - **A — Compare only:** human panel only; AI/shadow side-by-side
+   - **B — Gap-fill:** AI fills blank panel categories from official analysis FE
+   - **C — Equal vote:** official analysis FE counts as one virtual judge
+7. **Lock** the entry when done (`PATCH` status → `locked`).
+
+### Judge workflow
+
+1. Open the private invite URL (`/judge/{token}`) — no login required.
+2. Watch each video; enter Freestyle Evaluation (0–10 per category).
+3. **Save draft** or **Submit** (submitted scores are read-only).
+4. Links expire after **48 hours**; ask the admin for a new invite if expired.
+
+### Configuration
+
+| Variable | Purpose |
+| --- | --- |
+| `JUDGE_INVITE_BASE_URL` | Base URL for invite links (default `http://localhost:3000/judge`) |
+
+Design reference: [`multi_judge_entries.md`](multi_judge_entries.md).
+
+
 ## Key file reference
 
 | Topic | Path |
@@ -359,6 +401,8 @@ as tricks complete during playback (completed tricks only: `end_ms ≤ playhead`
 | Worker runner | `workers/src/yoyovision_workers/pipeline_runner.py` |
 | Worker settings | `workers/src/yoyovision_workers/config.py` |
 | Sample dataset | `ml/sample_data/dataset_v1/` |
+| Multi-judge design | `docs/multi_judge_entries.md` |
+| Judging admin UI | `frontend/src/app/admin/judging-entries/` |
 
 ### Environment variables (real weights)
 
@@ -392,6 +436,7 @@ Use this as a concrete order of operations for your first non-mock detector:
 - [`annotation_handbook.md`](annotation_handbook.md) — how to label `DatasetRecord` files
 - [`adapters.md`](adapters.md) — mock vs real adapters and swap procedure
 - [`architecture.md`](architecture.md) — module map
+- [`multi_judge_entries.md`](multi_judge_entries.md) — multi-judge panel design
 - [`ruleset.md`](ruleset.md) — scoring rules and unofficial-draft disclaimer
 
 ---

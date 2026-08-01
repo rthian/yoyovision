@@ -358,3 +358,164 @@ export interface Ruleset {
 export interface ApiErrorBody {
   detail?: string | { code?: string; message?: string } | unknown;
 }
+
+
+export type JudgingEntryMode = "training" | "contest";
+export type JudgingEntryStatus = "draft" | "open" | "locked";
+export type JudgeAssignmentStatus = "pending" | "in_progress" | "submitted";
+
+export interface JudgeFreestyleScore {
+  execution: number | null;
+  control: number | null;
+  trick_diversity: number | null;
+  space_use_emphasis: number | null;
+  music_choreography: number | null;
+  music_construction: number | null;
+  body_control: number | null;
+  showmanship: number | null;
+  notes: string;
+  is_submitted: boolean;
+  submitted_at: string | null;
+  updated_at: string;
+}
+
+export type JudgeFreestyleScoreUpsert = FreestyleEvaluationUpsert;
+
+export interface JudgeAccessVideo {
+  entry_video_id: string;
+  sort_order: number;
+  original_filename: string;
+  duration_ms: number | null;
+  mime_type: string | null;
+  my_score: JudgeFreestyleScore | null;
+}
+
+export interface JudgeAccessRead {
+  assignment_id: string;
+  display_name: string;
+  entry_id: string;
+  entry_title: string;
+  entry_mode: JudgingEntryMode;
+  entry_status: JudgingEntryStatus;
+  due_at: string | null;
+  token_expires_at: string;
+  videos: JudgeAccessVideo[];
+}
+
+export interface JudgingEntryVideoRead {
+  id: string;
+  video_id: string;
+  sort_order: number;
+  original_filename: string;
+  official_analysis_id: string | null;
+  shadow_analysis_id: string | null;
+}
+
+export interface JudgeAssignmentSummary {
+  id: string;
+  display_name: string;
+  token_prefix: string;
+  token_expires_at: string;
+  include_in_results: boolean;
+  is_shadow: boolean;
+  revoked_at: string | null;
+  status: JudgeAssignmentStatus;
+}
+
+export interface JudgingEntryRead {
+  id: string;
+  title: string;
+  mode: JudgingEntryMode;
+  status: JudgingEntryStatus;
+  ruleset_version: string;
+  ai_mix_profile: string;
+  aggregation_mode: string;
+  due_at: string | null;
+  created_at: string;
+  updated_at: string;
+  videos: JudgingEntryVideoRead[];
+  judges: JudgeAssignmentSummary[];
+}
+
+export interface JudgingEntryCreate {
+  title: string;
+  mode: JudgingEntryMode;
+  video_ids: string[];
+  ruleset_version?: string;
+  ai_mix_profile?: string;
+  aggregation_mode?: string;
+}
+
+export interface JudgeInviteRead {
+  assignment_id: string;
+  display_name: string;
+  token_prefix: string;
+  invite_url: string;
+  share_message: string;
+  token_expires_at: string;
+  include_in_results: boolean;
+  is_shadow: boolean;
+  status: JudgeAssignmentStatus;
+}
+
+export interface FeCategoryScores {
+  execution: number | null;
+  control: number | null;
+  trick_diversity: number | null;
+  space_use_emphasis: number | null;
+  music_choreography: number | null;
+  music_construction: number | null;
+  body_control: number | null;
+  showmanship: number | null;
+}
+
+export interface JudgeResultRow {
+  assignment_id: string;
+  display_name: string;
+  include_in_results: boolean;
+  is_shadow: boolean;
+  is_submitted: boolean;
+  included_in_aggregate: boolean;
+  scores: FeCategoryScores;
+  notes: string;
+}
+
+export interface VideoResults {
+  entry_video_id: string;
+  video_id: string;
+  sort_order: number;
+  original_filename: string;
+  official_analysis_id: string | null;
+  shadow_analysis_id: string | null;
+  judges: JudgeResultRow[];
+  panel_aggregate: FeCategoryScores;
+  human_aggregate: FeCategoryScores;
+  ai_fe: FeCategoryScores | null;
+  shadow_fe: FeCategoryScores | null;
+  ai_filled_categories: string[];
+  ai_virtual_judge_included: boolean;
+  effective_aggregation_mode: string;
+  warnings: string[];
+}
+
+export interface JudgingEntryResultsRead {
+  entry_id: string;
+  title: string;
+  mode: JudgingEntryMode;
+  status: JudgingEntryStatus;
+  ai_mix_profile: string;
+  aggregation_mode: string;
+  videos: VideoResults[];
+  warnings: string[];
+}
+
+export const FE_CATEGORY_COLUMNS: { key: keyof FeCategoryScores; label: string }[] = [
+  { key: "execution", label: "Exec" },
+  { key: "control", label: "Ctrl" },
+  { key: "trick_diversity", label: "Div" },
+  { key: "space_use_emphasis", label: "Space" },
+  { key: "music_choreography", label: "Choreo" },
+  { key: "music_construction", label: "Music" },
+  { key: "body_control", label: "Body" },
+  { key: "showmanship", label: "Show" },
+];

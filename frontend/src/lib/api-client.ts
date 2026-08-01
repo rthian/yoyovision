@@ -25,6 +25,15 @@ import type {
   ScorePreview,
   TokenResponse,
   VideoAsset,
+  JudgeAccessRead,
+  JudgeFreestyleScore,
+  JudgeFreestyleScoreUpsert,
+  JudgeInviteRead,
+  JudgingEntryCreate,
+  JudgingEntryMode,
+  JudgingEntryRead,
+  JudgingEntryStatus,
+  JudgingEntryResultsRead,
 } from "@/lib/types";
 
 const API_BASE_URL =
@@ -434,4 +443,151 @@ export function listRulesets(): Promise<Ruleset[]> {
 
 export function getRuleset(version: string): Promise<Ruleset> {
   return request<Ruleset>(`/rulesets/${version}`);
+}
+
+
+// --------------------------------------------------------------------------- //
+// Judge access (invite token — no owner JWT)
+// --------------------------------------------------------------------------- //
+
+async function judgeRequest<T>(
+  token: string,
+  pathSuffix: string,
+  options: RequestOptions = {}
+): Promise<T> {
+  const headers: Record<string, string> = {};
+  let body = options.body;
+  if (options.jsonBody !== undefined) {
+    headers["Content-Type"] = "application/json";
+    body = JSON.stringify(options.jsonBody);
+  }
+
+  const response = await fetch(buildUrl(`/judge-access/${token}${pathSuffix}`), {
+    method: options.method ?? "GET",
+    headers,
+    body,
+  });
+
+  if (!response.ok) {
+    let errorBody: ApiErrorBody = {};
+    try {
+      errorBody = (await response.json()) as ApiErrorBody;
+    } catch {
+      // ignore
+    }
+    throw new ApiError(
+      response.status,
+      extractErrorMessage(errorBody, `Request failed with status ${response.status}.`),
+      extractErrorCode(errorBody)
+    );
+  }
+
+  if (response.status === 204) {
+    return undefined as T;
+  }
+  return (await response.json()) as T;
+}
+
+async function judgeRequestBlob(token: string, pathSuffix: string): Promise<Blob> {
+  const response = await fetch(buildUrl(`/judge-access/${token}${pathSuffix}`));
+  if (!response.ok) {
+    throw new ApiError(response.status, `Video stream failed with status ${response.status}.`);
+  }
+  return response.blob();
+}
+
+export function getJudgeAccess(token: string): Promise<JudgeAccessRead> {
+  return judgeRequest<JudgeAccessRead>(token, "");
+}
+
+export function upsertJudgeFe(
+  token: string,
+  entryVideoId: string,
+  payload: JudgeFreestyleScoreUpsert
+): Promise<JudgeFreestyleScore> {
+  return judgeRequest<JudgeFreestyleScore>(token, `/videos/${entryVideoId}/fe`, {
+    method: "PUT",
+    jsonBody: payload,
+  });
+}
+
+export function submitJudgeFe(
+  token: string,
+  entryVideoId: string,
+  payload: JudgeFreestyleScoreUpsert
+): Promise<JudgeFreestyleScore> {
+  return judgeRequest<JudgeFreestyleScore>(token, `/videos/${entryVideoId}/submit`, {
+    method: "POST",
+    jsonBody: payload,
+  });
+}
+
+export async function fetchJudgeVideoBlobUrl(
+  token: string,
+  entryVideoId: string
+): Promise<string> {
+  const blob = await judgeRequestBlob(token, `/videos/${entryVideoId}/stream`);
+  return URL.createObjectURL(blob);
+}
+
+// --------------------------------------------------------------------------- //
+// Admin judging entries
+// --------------------------------------------------------------------------- //
+
+export function listJudgingEntries(): Promise<JudgingEntryRead[]> {
+  return request<JudgingEntryRead[]>("/judging-entries");
+}
+
+export function createJudgingEntry(payload: JudgingEntryCreate): Promise<JudgingEntryRead> {
+  return request<JudgingEntryRead>("/judging-entries", { method: "POST", jsonBody: payload });
+}
+
+export function getJudgingEntry(entryId: string): Promise<JudgingEntryRead> {
+  return request<JudgingEntryRead>(`/judging-entries/${entryId}`);
+}
+
+export function updateJudgingEntry(
+  entryId: string,
+  payload: Partial<{
+    title: string;
+    mode: JudgingEntryMode;
+    status: JudgingEntryStatus;
+    ai_mix_profile: string;
+    aggregation_mode: string;
+  }>
+): Promise<JudgingEntryRead> {
+  return request<JudgingEntryRead>(`/judging-entries/${entryId}`, {
+    method: "PATCH",
+    jsonBody: payload,
+  });
+}
+
+export function addJudgeToEntry(
+  entryId: string,
+  payload: { display_name: string }
+): Promise<JudgeInviteRead> {
+  return request<JudgeInviteRead>(`/judging-entries/${entryId}/judges`, {
+    method: "POST",
+    jsonBody: payload,
+  });
+}
+
+export function rotateJudgeInvite(
+  entryId: string,
+  assignmentId: string
+): Promise<JudgeInviteRead> {
+  return request<JudgeInviteRead>(
+    `/judging-entries/${entryId}/judges/${assignmentId}/rotate`,
+    { method: "POST" }
+  );
+}
+
+export function getJudgingEntryResults(entryId: string): Promise<JudgingEntryResultsRead> {
+  return request<JudgingEntryResultsRead>(`/judging-entries/${entryId}/results`);
+}
+
+export function revokeJudgeInvite(entryId: string, assignmentId: string): Promise<void> {
+  return request<void>(`/judging-entries/${entryId}/judges/${assignmentId}/revoke`, {
+    method: "POST",
+  });
 }
