@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { AuthGate } from "@/components/AuthGate";
 import { JudgeInviteShareModal } from "@/components/JudgeInviteShareModal";
+import { JudgingEntryCalibration } from "@/components/JudgingEntryCalibration";
 import { JudgingEntryResults } from "@/components/JudgingEntryResults";
 import {
   addJudgeToEntry,
@@ -43,7 +44,11 @@ function EntryDetail({ entryId }: { entryId: string }): JSX.Element {
   });
 
   const profileMutation = useMutation({
-    mutationFn: (payload: { ai_mix_profile?: string; aggregation_mode?: string }) =>
+    mutationFn: (payload: {
+      ai_mix_profile?: string;
+      aggregation_mode?: string;
+      click_mode?: string;
+    }) =>
       updateJudgingEntry(entryId, payload),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["judgingEntry", entryId] });
@@ -86,6 +91,19 @@ function EntryDetail({ entryId }: { entryId: string }): JSX.Element {
               <option value="A">A — Compare only</option>
               <option value="B">B — Gap-fill</option>
               <option value="C">C — AI virtual judge</option>
+            </select>
+          </label>
+          <label className="flex flex-col gap-1 text-xs text-content-dim">
+            Click mode
+            <select
+              value={entry.click_mode ?? "off"}
+              disabled={profileMutation.isPending}
+              onChange={(e) => profileMutation.mutate({ click_mode: e.target.value })}
+              className="h-9 rounded-s border border-outline-default px-2 text-sm"
+            >
+              <option value="off">Off</option>
+              <option value="training_only">Training only</option>
+              <option value="technical_score">Technical score</option>
             </select>
           </label>
           <label className="flex flex-col gap-1 text-xs text-content-dim">
@@ -188,6 +206,8 @@ function EntryDetail({ entryId }: { entryId: string }): JSX.Element {
           })}
         </ul>
       </section>
+
+      <JudgingEntryCalibration entryId={entryId} />
 
       <JudgingEntryResults entryId={entryId} />
 

@@ -26,6 +26,9 @@ import type {
   TokenResponse,
   VideoAsset,
   JudgeAccessRead,
+  JudgeClick,
+  JudgeClickCreate,
+  JudgingEntryCalibrationRead,
   JudgeFreestyleScore,
   JudgeFreestyleScoreUpsert,
   JudgeInviteRead,
@@ -522,6 +525,26 @@ export function submitJudgeFe(
   });
 }
 
+
+export function createJudgeClick(
+  token: string,
+  entryVideoId: string,
+  payload: JudgeClickCreate
+): Promise<JudgeClick> {
+  return judgeRequest<JudgeClick>(token, `/videos/${entryVideoId}/clicks`, {
+    method: "POST",
+    jsonBody: payload,
+  });
+}
+
+export function deleteJudgeClick(token: string, clickId: string): Promise<void> {
+  return judgeRequest<void>(token, `/clicks/${clickId}`, { method: "DELETE" });
+}
+
+export function listJudgeClicks(token: string, entryVideoId: string): Promise<JudgeClick[]> {
+  return judgeRequest<JudgeClick[]>(token, `/videos/${entryVideoId}/clicks`);
+}
+
 export async function fetchJudgeVideoBlobUrl(
   token: string,
   entryVideoId: string
@@ -554,6 +577,7 @@ export function updateJudgingEntry(
     status: JudgingEntryStatus;
     ai_mix_profile: string;
     aggregation_mode: string;
+    click_mode: string;
   }>
 ): Promise<JudgingEntryRead> {
   return request<JudgingEntryRead>(`/judging-entries/${entryId}`, {
@@ -584,6 +608,15 @@ export function rotateJudgeInvite(
 
 export function getJudgingEntryResults(entryId: string): Promise<JudgingEntryResultsRead> {
   return request<JudgingEntryResultsRead>(`/judging-entries/${entryId}/results`);
+}
+
+export function getJudgingEntryCalibration(
+  entryId: string,
+  toleranceMs = 1000
+): Promise<JudgingEntryCalibrationRead> {
+  return request<JudgingEntryCalibrationRead>(
+    `/judging-entries/${entryId}/calibration?tolerance_ms=${toleranceMs}`
+  );
 }
 
 export function revokeJudgeInvite(entryId: string, assignmentId: string): Promise<void> {

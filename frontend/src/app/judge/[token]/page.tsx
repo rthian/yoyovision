@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 
+import { JudgeClicker } from "@/components/JudgeClicker";
 import { JudgeFreestyleForm } from "@/components/JudgeFreestyleForm";
 import { ApiError } from "@/lib/api-client";
 import {
@@ -32,6 +33,7 @@ export default function JudgePage({ params }: JudgePageProps): JSX.Element {
   const upsert = useUpsertJudgeFe(token, activeVideoId ?? "");
   const submit = useSubmitJudgeFe(token, activeVideoId ?? "");
   const videoBlob = useJudgeVideoBlobUrl(token, activeVideoId, Boolean(activeVideoId));
+  const videoRef = useRef<HTMLVideoElement | null>(null);
 
   if (accessQuery.isLoading) {
     return <p className="text-sm text-content-dim">Loading your judging session…</p>;
@@ -104,8 +106,23 @@ export default function JudgePage({ params }: JudgePageProps): JSX.Element {
               Could not load video.
             </p>
           ) : videoBlob.blobUrl ? (
-            <video controls src={videoBlob.blobUrl} className="w-full rounded-m bg-black" />
+            <video
+              ref={videoRef}
+              controls
+              src={videoBlob.blobUrl}
+              className="w-full rounded-m bg-black"
+            />
           ) : null}
+
+          <JudgeClicker
+            token={token}
+            entryVideoId={activeVideo.entry_video_id}
+            clickMode={data.click_mode}
+            durationMs={activeVideo.duration_ms ?? 0}
+            clicks={activeVideo.my_clicks ?? []}
+            readOnly={activeVideo.my_score?.is_submitted ?? false}
+            videoRef={videoRef}
+          />
 
           <JudgeFreestyleForm
             score={activeVideo.my_score}

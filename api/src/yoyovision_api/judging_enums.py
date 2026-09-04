@@ -38,3 +38,10 @@ class JudgeAssignmentStatus(StrEnum):
     PENDING = "pending"
     IN_PROGRESS = "in_progress"
     SUBMITTED = "submitted"
+
+class ClickMode(StrEnum):
+    """Phase F: timestamp clicker behavior for judging entries."""
+
+    OFF = "off"
+    TRAINING_ONLY = "training_only"
+    TECHNICAL_SCORE = "technical_score"

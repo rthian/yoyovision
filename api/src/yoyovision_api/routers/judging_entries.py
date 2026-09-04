@@ -19,9 +19,10 @@ from yoyovision_api.schemas import (
     JudgingEntryVideoAnalysisLink,
     JudgingEntryVideoAttach,
     JudgingEntryVideoRead,
+    JudgingEntryCalibrationRead,
     JudgingEntryResultsRead,
 )
-from yoyovision_api.services import judging_results_service, judging_service
+from yoyovision_api.services import judging_calibration_service, judging_results_service, judging_service
 
 router = APIRouter(prefix="/judging-entries", tags=["judging-entries"])
 
@@ -35,6 +36,7 @@ def _entry_to_read(entry: JudgingEntryORM) -> JudgingEntryRead:
         ruleset_version=entry.ruleset_version,
         ai_mix_profile=entry.ai_mix_profile,
         aggregation_mode=entry.aggregation_mode,
+        click_mode=entry.click_mode,
         due_at=entry.due_at,
         created_at=entry.created_at,
         updated_at=entry.updated_at,
@@ -103,6 +105,7 @@ async def create_judging_entry(
           ruleset_version=payload.ruleset_version or settings.ruleset_version,
           ai_mix_profile=payload.ai_mix_profile,
           aggregation_mode=payload.aggregation_mode,
+          click_mode=payload.click_mode,
           due_at=payload.due_at,
           video_ids=payload.video_ids,
       )
@@ -129,6 +132,27 @@ async def get_judging_entry(
 
 
 
+
+
+
+@router.get("/{entry_id}/calibration", response_model=JudgingEntryCalibrationRead)
+async def get_judging_entry_calibration(
+    entry_id: str,
+    session: DbSession,
+    admin: CurrentAdmin,
+    tolerance_ms: int = 1000,
+) -> JudgingEntryCalibrationRead:
+    try:
+        return await judging_calibration_service.compute_entry_calibration(
+            session, entry_id, tolerance_ms=tolerance_ms
+        )
+    except judging_service.JudgingServiceError as exc:
+        status_code = (
+            status.HTTP_404_NOT_FOUND
+            if "not found" in str(exc).lower()
+            else status.HTTP_422_UNPROCESSABLE_ENTITY
+        )
+        raise HTTPException(status_code=status_code, detail=str(exc)) from exc
 
 @router.get("/{entry_id}/results", response_model=JudgingEntryResultsRead)
 async def get_judging_entry_results(
@@ -164,6 +188,7 @@ async def update_judging_entry(
             ruleset_version=payload.ruleset_version,
             ai_mix_profile=payload.ai_mix_profile,
             aggregation_mode=payload.aggregation_mode,
+            click_mode=payload.click_mode,
             due_at=payload.due_at,
             clear_due_at=payload.clear_due_at,
         )

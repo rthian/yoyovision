@@ -10,6 +10,7 @@ from yoyovision_api.judging_enums import (
     AggregationMode,
     AiMixProfile,
     JudgeAssignmentStatus,
+    ClickMode,
     JudgingEntryMode,
     JudgingEntryStatus,
 )
@@ -278,6 +279,7 @@ class JudgingEntryCreate(BaseModel):
     ruleset_version: str | None = None
     ai_mix_profile: AiMixProfile = AiMixProfile.COMPARE_ONLY
     aggregation_mode: AggregationMode = AggregationMode.AUTO
+    click_mode: ClickMode = ClickMode.OFF
     due_at: datetime | None = None
     video_ids: list[str] = Field(min_length=1)
 
@@ -289,6 +291,7 @@ class JudgingEntryUpdate(BaseModel):
     ruleset_version: str | None = None
     ai_mix_profile: AiMixProfile | None = None
     aggregation_mode: AggregationMode | None = None
+    click_mode: ClickMode | None = None
     due_at: datetime | None = None
     clear_due_at: bool = False
 
@@ -348,6 +351,7 @@ class JudgingEntryRead(BaseModel):
     ruleset_version: str
     ai_mix_profile: AiMixProfile
     aggregation_mode: AggregationMode
+    click_mode: ClickMode
     due_at: datetime | None
     created_at: datetime
     updated_at: datetime
@@ -394,6 +398,7 @@ class JudgeAccessVideoRead(BaseModel):
     duration_ms: int | None
     mime_type: str | None
     my_score: JudgeFreestyleScoreRead | None
+    my_clicks: list["JudgeClickRead"] = Field(default_factory=list)
 
 
 class JudgeAccessRead(BaseModel):
@@ -405,8 +410,61 @@ class JudgeAccessRead(BaseModel):
     entry_status: JudgingEntryStatus
     due_at: datetime | None
     token_expires_at: datetime
+    click_mode: ClickMode
     videos: list[JudgeAccessVideoRead]
 
+
+
+class JudgeClickRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    timestamp_ms: int
+    label: str | None
+    created_at: datetime
+
+
+class JudgeClickCreate(BaseModel):
+    timestamp_ms: int = Field(ge=0)
+    label: str | None = Field(default=None, max_length=128)
+
+
+class ClickMatchRead(BaseModel):
+    click_id: str
+    timestamp_ms: int
+    label: str | None
+    matched_event_label: str | None
+    boundary_error_ms: int | None
+
+
+class JudgeClickCalibrationRead(BaseModel):
+    assignment_id: str
+    display_name: str
+    click_count: int
+    matches: list[ClickMatchRead]
+    model_event_count: int
+    precision: float | None
+    recall: float | None
+    mean_boundary_error_ms: float | None
+
+
+class VideoClickCalibrationRead(BaseModel):
+    entry_video_id: str
+    original_filename: str
+    official_analysis_id: str | None
+    model_event_count: int
+    judges: list[JudgeClickCalibrationRead]
+    panel_click_count: int
+    panel_mean_clicks: float | None
+
+
+class JudgingEntryCalibrationRead(BaseModel):
+    entry_id: str
+    title: str
+    click_mode: ClickMode
+    tolerance_ms: int
+    videos: list[VideoClickCalibrationRead]
+    warnings: list[str]
 
 # --- Judging entry results (Phase D) ---
 

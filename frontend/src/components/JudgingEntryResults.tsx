@@ -65,6 +65,7 @@ export function JudgingEntryResults({ entryId }: JudgingEntryResultsProps): JSX.
         <h2 className="text-lg font-semibold text-content-default">Results</h2>
         <p className="text-sm text-content-dim">
           Profile {results.ai_mix_profile} · aggregation {results.aggregation_mode}
+          {results.click_mode !== "off" ? ` · clicker ${results.click_mode}` : ""}
         </p>
       </div>
 
@@ -76,6 +77,9 @@ export function JudgingEntryResults({ entryId }: JudgingEntryResultsProps): JSX.
             </p>
             <p className="text-xs text-content-dim">
               Mode: {video.effective_aggregation_mode}
+              {video.panel_click_count !== null
+                ? ` · panel clicks ${video.panel_click_count}`
+                : ""}
               {video.ai_virtual_judge_included ? " · AI virtual judge included" : ""}
             </p>
           </div>
@@ -83,6 +87,9 @@ export function JudgingEntryResults({ entryId }: JudgingEntryResultsProps): JSX.
             <thead>
               <tr className="border-b border-outline-soft text-left text-xs text-content-dim">
                 <th className="px-4 py-2">Judge</th>
+                {results.click_mode !== "off" ? (
+                  <th className="px-2 py-2 text-center">Clicks</th>
+                ) : null}
                 {FE_CATEGORY_COLUMNS.map((col) => (
                   <th key={col.key} className="px-2 py-2 text-center">
                     {col.label}
@@ -103,6 +110,11 @@ export function JudgingEntryResults({ entryId }: JudgingEntryResultsProps): JSX.
                     {judge.is_shadow ? " (shadow)" : ""}
                     {!judge.is_submitted ? " (draft)" : ""}
                   </td>
+                  {results.click_mode !== "off" ? (
+                    <td className="px-2 py-2 text-center text-sm tabular-nums">
+                      {judge.click_count}
+                    </td>
+                  ) : null}
                   <ScoreCells scores={judge.scores} />
                 </tr>
               ))}

@@ -30,6 +30,7 @@ from yoyovision_api.db import Base
 from yoyovision_api.judging_enums import (
     AggregationMode,
     AiMixProfile,
+    ClickMode,
     JudgingEntryMode,
     JudgingEntryStatus,
     UserRole,
@@ -291,6 +292,9 @@ class JudgingEntryORM(Base):
     aggregation_mode: Mapped[AggregationMode] = mapped_column(
         _str_enum(AggregationMode, 16), nullable=False, default=AggregationMode.AUTO
     )
+    click_mode: Mapped[ClickMode] = mapped_column(
+        _str_enum(ClickMode, 24), nullable=False, default=ClickMode.OFF
+    )
     created_by: Mapped[str] = mapped_column(
         String(36), ForeignKey("users.id"), index=True, nullable=False
     )
@@ -355,6 +359,9 @@ class JudgeAssignmentORM(Base):
     freestyle_scores: Mapped[list[JudgeFreestyleScoreORM]] = relationship(
         back_populates="assignment", cascade="all, delete-orphan"
     )
+    clicks: Mapped[list["JudgeClickORM"]] = relationship(
+        back_populates="assignment", cascade="all, delete-orphan"
+    )
 
 
 class JudgeFreestyleScoreORM(Base):
@@ -386,4 +393,21 @@ class JudgeFreestyleScoreORM(Base):
     )
 
     assignment: Mapped[JudgeAssignmentORM] = relationship(back_populates="freestyle_scores")
+    entry_video: Mapped[JudgingEntryVideoORM] = relationship()
+
+class JudgeClickORM(Base):
+    __tablename__ = "judge_clicks"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    assignment_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("judge_assignments.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    entry_video_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("judging_entry_videos.id", ondelete="CASCADE"), nullable=False
+    )
+    timestamp_ms: Mapped[int] = mapped_column(Integer, nullable=False)
+    label: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    assignment: Mapped[JudgeAssignmentORM] = relationship(back_populates="clicks")
     entry_video: Mapped[JudgingEntryVideoORM] = relationship()
