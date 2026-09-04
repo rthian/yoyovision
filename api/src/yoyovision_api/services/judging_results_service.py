@@ -13,7 +13,7 @@ from yoyovision_api.db_models import (
     JudgingEntryORM,
     JudgingEntryVideoORM,
 )
-from yoyovision_api.judging_enums import AiMixProfile, AggregationMode
+from yoyovision_api.judging_enums import AiMixProfile, AggregationMode, ClickMode
 from yoyovision_api.schemas import (
     FeCategoryScores,
     JudgeResultRow,
@@ -146,6 +146,7 @@ async def compute_entry_results(session: AsyncSession, entry_id: str) -> Judging
         .options(
             selectinload(JudgingEntryORM.videos).selectinload(JudgingEntryVideoORM.video),
             selectinload(JudgingEntryORM.judges).selectinload(JudgeAssignmentORM.freestyle_scores),
+            selectinload(JudgingEntryORM.judges).selectinload(JudgeAssignmentORM.clicks),
         )
     )
     entry = result.scalar_one_or_none()
@@ -184,6 +185,9 @@ async def compute_entry_results(session: AsyncSession, entry_id: str) -> Judging
             )
             if included:
                 aggregate_pool.append(_orm_to_ml_score(assignment, score))
+            click_count = sum(
+                1 for click in assignment.clicks if click.entry_video_id == entry_video.id
+            )
             judge_rows.append(
                 JudgeResultRow(
                     assignment_id=assignment.id,
@@ -203,6 +207,7 @@ async def compute_entry_results(session: AsyncSession, entry_id: str) -> Judging
                         showmanship=score.showmanship,
                     ),
                     notes=score.notes,
+                    click_count=click_count,
                 )
             )
 
@@ -246,6 +251,18 @@ async def compute_entry_results(session: AsyncSession, entry_id: str) -> Judging
             )
             video_warnings.extend(profile_warnings)
 
+        panel_click_counts = [
+            sum(1 for click in a.clicks if click.entry_video_id == entry_video.id)
+            for a in entry.judges
+            if a.include_in_results and not a.is_shadow
+        ]
+        panel_click_count = sum(panel_click_counts) if panel_click_counts else None
+        panel_mean_clicks = (
+            sum(panel_click_counts) / len(panel_click_counts)
+            if panel_click_counts
+            else None
+        )
+
         video_results.append(
             VideoResults(
                 entry_video_id=entry_video.id,
@@ -262,6 +279,8 @@ async def compute_entry_results(session: AsyncSession, entry_id: str) -> Judging
                 ai_filled_categories=ai_filled,
                 ai_virtual_judge_included=ai_virtual,
                 effective_aggregation_mode=mode_value,
+                panel_click_count=panel_click_count if entry.click_mode != ClickMode.OFF else None,
+                panel_mean_clicks=panel_mean_clicks if entry.click_mode != ClickMode.OFF else None,
                 warnings=video_warnings,
             )
         )
@@ -269,6 +288,7 @@ async def compute_entry_results(session: AsyncSession, entry_id: str) -> Judging
     return JudgingEntryResultsRead(
         entry_id=entry.id,
         title=entry.title,
+        click_mode=entry.click_mode,
         mode=entry.mode,
         status=entry.status,
         ai_mix_profile=entry.ai_mix_profile,

@@ -11,6 +11,7 @@ from sqlalchemy.orm import selectinload
 from yoyovision_api.db_models import (
     AnalysisJobORM,
     JudgeAssignmentORM,
+    JudgeClickORM,
     JudgeFreestyleScoreORM,
     JudgingEntryORM,
     JudgingEntryVideoORM,
@@ -20,11 +21,12 @@ from yoyovision_api.db_models import (
 from yoyovision_api.judging_enums import (
     AggregationMode,
     AiMixProfile,
+    ClickMode,
     JudgeAssignmentStatus,
     JudgingEntryMode,
     JudgingEntryStatus,
 )
-from yoyovision_api.schemas import JudgeFreestyleScoreUpsert
+from yoyovision_api.schemas import JudgeClickCreate, JudgeFreestyleScoreUpsert
 from yoyovision_api.services.invite_token import (
     generate_invite_token,
     hash_token,
@@ -124,6 +126,7 @@ async def create_entry(
     ruleset_version: str,
     ai_mix_profile: AiMixProfile,
     aggregation_mode: AggregationMode,
+    click_mode: ClickMode = ClickMode.OFF,
     due_at: datetime | None,
     video_ids: list[str],
 ) -> JudgingEntryORM:
@@ -143,6 +146,7 @@ async def create_entry(
         ruleset_version=ruleset_version,
         ai_mix_profile=ai_mix_profile,
         aggregation_mode=aggregation_mode,
+        click_mode=click_mode,
         created_by=admin.id,
         due_at=due_at,
     )
@@ -160,7 +164,13 @@ async def create_entry(
 
 async def list_entries(session: AsyncSession) -> list[JudgingEntryORM]:
     result = await session.execute(
-        select(JudgingEntryORM).order_by(JudgingEntryORM.created_at.desc())
+        select(JudgingEntryORM)
+        .order_by(JudgingEntryORM.created_at.desc())
+        .options(
+            selectinload(JudgingEntryORM.videos).selectinload(JudgingEntryVideoORM.video),
+            selectinload(JudgingEntryORM.judges).selectinload(JudgeAssignmentORM.freestyle_scores),
+            selectinload(JudgingEntryORM.judges).selectinload(JudgeAssignmentORM.clicks),
+        )
     )
     return list(result.scalars().all())
 
@@ -172,6 +182,7 @@ async def get_entry(session: AsyncSession, entry_id: str) -> JudgingEntryORM:
         .options(
             selectinload(JudgingEntryORM.videos).selectinload(JudgingEntryVideoORM.video),
             selectinload(JudgingEntryORM.judges).selectinload(JudgeAssignmentORM.freestyle_scores),
+            selectinload(JudgingEntryORM.judges).selectinload(JudgeAssignmentORM.clicks),
         )
     )
     entry = result.scalar_one_or_none()
@@ -190,6 +201,7 @@ async def update_entry(
     ruleset_version: str | None = None,
     ai_mix_profile: AiMixProfile | None = None,
     aggregation_mode: AggregationMode | None = None,
+    click_mode: ClickMode | None = None,
     due_at: datetime | None = None,
     clear_due_at: bool = False,
 ) -> JudgingEntryORM:
@@ -202,6 +214,7 @@ async def update_entry(
                 ruleset_version,
                 ai_mix_profile,
                 aggregation_mode,
+                click_mode,
             )
         ) or clear_due_at or due_at is not None:
             raise JudgingServiceError("Locked entries cannot be edited.")
@@ -218,6 +231,8 @@ async def update_entry(
         entry.ai_mix_profile = ai_mix_profile
     if aggregation_mode is not None:
         entry.aggregation_mode = aggregation_mode
+    if click_mode is not None:
+        entry.click_mode = click_mode
     if clear_due_at:
         entry.due_at = None
     elif due_at is not None:
@@ -340,6 +355,7 @@ async def resolve_assignment_by_token(
             .selectinload(JudgingEntryORM.videos)
             .selectinload(JudgingEntryVideoORM.video),
             selectinload(JudgeAssignmentORM.freestyle_scores),
+            selectinload(JudgeAssignmentORM.clicks),
         )
     )
     assignment = result.scalar_one_or_none()
@@ -422,6 +438,58 @@ async def submit_judge_fe(
     await session.refresh(score)
     return score
 
+
+
+def _clicks_for_video(
+    assignment: JudgeAssignmentORM, entry_video_id: str
+) -> list[JudgeClickORM]:
+    return [click for click in assignment.clicks if click.entry_video_id == entry_video_id]
+
+
+def _assert_clicks_editable(assignment: JudgeAssignmentORM, entry_video_id: str) -> None:
+    _assert_entry_writable(assignment.entry)
+    score = _score_for_video(assignment, entry_video_id)
+    if score is not None and score.is_submitted:
+        raise JudgingAccessError("Scores already submitted; clicks are locked.")
+
+
+async def add_judge_click(
+    session: AsyncSession,
+    assignment: JudgeAssignmentORM,
+    entry_video_id: str,
+    payload: JudgeClickCreate,
+) -> JudgeClickORM:
+    if assignment.entry.click_mode == ClickMode.OFF:
+        raise JudgingAccessError("Clicker is not enabled for this entry.")
+    _assert_clicks_editable(assignment, entry_video_id)
+    await get_entry_video_for_assignment(assignment, entry_video_id)
+
+    click = JudgeClickORM(
+        assignment_id=assignment.id,
+        entry_video_id=entry_video_id,
+        timestamp_ms=payload.timestamp_ms,
+        label=payload.label,
+    )
+    session.add(click)
+    assignment.clicks.append(click)
+    await session.commit()
+    await session.refresh(click)
+    return click
+
+
+async def delete_judge_click(
+    session: AsyncSession,
+    assignment: JudgeAssignmentORM,
+    click_id: str,
+) -> None:
+    if assignment.entry.click_mode == ClickMode.OFF:
+        raise JudgingAccessError("Clicker is not enabled for this entry.")
+    click = next((row for row in assignment.clicks if row.id == click_id), None)
+    if click is None:
+        raise JudgingAccessError("Click not found.")
+    _assert_clicks_editable(assignment, click.entry_video_id)
+    await session.delete(click)
+    await session.commit()
 
 def build_invite_url(base_url: str, raw_token: str) -> str:
     base = base_url.rstrip("/")

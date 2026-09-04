@@ -362,6 +362,7 @@ export interface ApiErrorBody {
 
 export type JudgingEntryMode = "training" | "contest";
 export type JudgingEntryStatus = "draft" | "open" | "locked";
+export type ClickMode = "off" | "training_only" | "technical_score";
 export type JudgeAssignmentStatus = "pending" | "in_progress" | "submitted";
 
 export interface JudgeFreestyleScore {
@@ -388,6 +389,7 @@ export interface JudgeAccessVideo {
   duration_ms: number | null;
   mime_type: string | null;
   my_score: JudgeFreestyleScore | null;
+  my_clicks: JudgeClick[];
 }
 
 export interface JudgeAccessRead {
@@ -399,6 +401,7 @@ export interface JudgeAccessRead {
   entry_status: JudgingEntryStatus;
   due_at: string | null;
   token_expires_at: string;
+  click_mode: ClickMode;
   videos: JudgeAccessVideo[];
 }
 
@@ -430,6 +433,7 @@ export interface JudgingEntryRead {
   ruleset_version: string;
   ai_mix_profile: string;
   aggregation_mode: string;
+  click_mode: ClickMode;
   due_at: string | null;
   created_at: string;
   updated_at: string;
@@ -444,6 +448,7 @@ export interface JudgingEntryCreate {
   ruleset_version?: string;
   ai_mix_profile?: string;
   aggregation_mode?: string;
+  click_mode?: ClickMode;
 }
 
 export interface JudgeInviteRead {
@@ -478,6 +483,57 @@ export interface JudgeResultRow {
   included_in_aggregate: boolean;
   scores: FeCategoryScores;
   notes: string;
+  click_count: number;
+}
+
+export interface JudgeClick {
+  id: string;
+  timestamp_ms: number;
+  label: string | null;
+  created_at: string;
+}
+
+export interface JudgeClickCreate {
+  timestamp_ms: number;
+  label?: string | null;
+}
+
+export interface ClickMatchRead {
+  click_id: string;
+  timestamp_ms: number;
+  label: string | null;
+  matched_event_label: string | null;
+  boundary_error_ms: number | null;
+}
+
+export interface JudgeClickCalibration {
+  assignment_id: string;
+  display_name: string;
+  click_count: number;
+  matches: ClickMatchRead[];
+  model_event_count: number;
+  precision: number | null;
+  recall: number | null;
+  mean_boundary_error_ms: number | null;
+}
+
+export interface VideoClickCalibration {
+  entry_video_id: string;
+  original_filename: string;
+  official_analysis_id: string | null;
+  model_event_count: number;
+  judges: JudgeClickCalibration[];
+  panel_click_count: number;
+  panel_mean_clicks: number | null;
+}
+
+export interface JudgingEntryCalibrationRead {
+  entry_id: string;
+  title: string;
+  click_mode: ClickMode;
+  tolerance_ms: number;
+  videos: VideoClickCalibration[];
+  warnings: string[];
 }
 
 export interface VideoResults {
@@ -495,12 +551,15 @@ export interface VideoResults {
   ai_filled_categories: string[];
   ai_virtual_judge_included: boolean;
   effective_aggregation_mode: string;
+  panel_click_count: number | null;
+  panel_mean_clicks: number | null;
   warnings: string[];
 }
 
 export interface JudgingEntryResultsRead {
   entry_id: string;
   title: string;
+  click_mode: ClickMode;
   mode: JudgingEntryMode;
   status: JudgingEntryStatus;
   ai_mix_profile: string;

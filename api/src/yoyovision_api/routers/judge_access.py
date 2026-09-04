@@ -10,6 +10,8 @@ from yoyovision_api.judging_enums import JudgingEntryStatus
 from yoyovision_api.schemas import (
     JudgeAccessRead,
     JudgeAccessVideoRead,
+    JudgeClickCreate,
+    JudgeClickRead,
     JudgeFreestyleScoreRead,
     JudgeFreestyleScoreUpsert,
 )
@@ -81,6 +83,13 @@ def _build_access_read(assignment: object) -> JudgeAccessRead:
                 duration_ms=asset.duration_ms,
                 mime_type=asset.mime_type,
                 my_score=_score_to_read(score),
+                my_clicks=[
+                    JudgeClickRead.model_validate(click)
+                    for click in sorted(
+                        judging_service._clicks_for_video(assignment, entry_video.id),
+                        key=lambda row: row.timestamp_ms,
+                    )
+                ],
             )
         )
     return JudgeAccessRead(
@@ -92,6 +101,7 @@ def _build_access_read(assignment: object) -> JudgeAccessRead:
         entry_status=entry.status,
         due_at=entry.due_at,
         token_expires_at=assignment.token_expires_at,
+        click_mode=entry.click_mode,
         videos=videos,
     )
 
@@ -178,3 +188,55 @@ async def submit_judge_fe(
     except judging_service.JudgingServiceError as exc:
         raise _map_service_error(exc) from exc
     return JudgeFreestyleScoreRead.model_validate(score)
+
+@router.get(
+    "/{token}/videos/{entry_video_id}/clicks",
+    response_model=list[JudgeClickRead],
+)
+async def list_judge_clicks(
+    token: str,
+    entry_video_id: str,
+    session: DbSession,
+) -> list[JudgeClickRead]:
+    try:
+        assignment = await _resolve_assignment(session, token, require_readable=True)
+        await judging_service.get_entry_video_for_assignment(assignment, entry_video_id)
+        clicks = judging_service._clicks_for_video(assignment, entry_video_id)
+    except judging_service.JudgingServiceError as exc:
+        raise _map_service_error(exc) from exc
+    return [JudgeClickRead.model_validate(click) for click in sorted(clicks, key=lambda row: row.timestamp_ms)]
+
+
+@router.post(
+    "/{token}/videos/{entry_video_id}/clicks",
+    response_model=JudgeClickRead,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_judge_click(
+    token: str,
+    entry_video_id: str,
+    payload: JudgeClickCreate,
+    session: DbSession,
+) -> JudgeClickRead:
+    try:
+        assignment = await judging_service.resolve_assignment_by_token(session, token)
+        click = await judging_service.add_judge_click(
+            session, assignment, entry_video_id, payload
+        )
+    except judging_service.JudgingServiceError as exc:
+        raise _map_service_error(exc) from exc
+    return JudgeClickRead.model_validate(click)
+
+
+@router.delete("/{token}/clicks/{click_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_judge_click(
+    token: str,
+    click_id: str,
+    session: DbSession,
+) -> None:
+    try:
+        assignment = await judging_service.resolve_assignment_by_token(session, token)
+        await judging_service.delete_judge_click(session, assignment, click_id)
+    except judging_service.JudgingServiceError as exc:
+        raise _map_service_error(exc) from exc
+
