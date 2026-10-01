@@ -13,6 +13,20 @@ from yoyovision_ml.media_validation import sniff_container_mime_type
 
 _VIDEO_ID_RE = re.compile(r"^[A-Za-z0-9_-]{11}$")
 _YOUTUBE_HOSTS = {"youtube.com", "www.youtube.com", "m.youtube.com", "youtu.be"}
+_YOUTUBE_FORMAT_SELECTOR = "/".join(
+    (
+        # Prefer a progressive file when YouTube exposes one. Many current
+        # uploads expose only separate DASH video/audio streams, though, and
+        # YoYoVision's visual analysis does not require an audio track. The
+        # video-only fallbacks avoid requiring ffmpeg just to merge audio.
+        "best[ext=mp4][vcodec!=none][acodec!=none][height<=720]",
+        "best[ext=webm][vcodec!=none][acodec!=none][height<=720]",
+        "bestvideo[ext=mp4][vcodec^=avc1][height<=720]",
+        "bestvideo[ext=mp4][height<=720]",
+        "bestvideo[ext=webm][height<=720]",
+        "bestvideo[height<=720]",
+    )
+)
 
 
 class YoutubeImportError(ValueError):
@@ -83,14 +97,16 @@ def _download_sync(
         with tempfile.TemporaryDirectory(prefix="yoyovision-youtube-") as directory:
             output_template = str(Path(directory) / "video.%(ext)s")
             options = {
-                "format": (
-                    "best[ext=mp4][vcodec!=none][acodec!=none]/"
-                    "best[ext=webm][vcodec!=none][acodec!=none]/best"
-                ),
+                "format": _YOUTUBE_FORMAT_SELECTOR,
                 "outtmpl": output_template,
                 "noplaylist": True,
                 "quiet": True,
+                "noprogress": True,
                 "no_warnings": True,
+                # Recent yt-dlp versions need a JavaScript runtime for the
+                # complete set of YouTube formats. Node is already required by
+                # the frontend and is therefore available in normal installs.
+                "js_runtimes": {"node": {}},
                 "max_filesize": max_bytes,
                 "restrictfilenames": True,
                 "socket_timeout": 30,
