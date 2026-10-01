@@ -2,7 +2,7 @@
   "name": "yoyovision-frontend",
   "version": "0.1.0",
   "private": true,
-  "description": "YoYoVision review UI: upload 1A freestyle videos and review/edit AI-assisted event detections, deductions and scoring.",
+  "description": "YoYoVision review UI for division-aware freestyle uploads, manual judging, and 1A AI-assisted analysis.",
   "scripts": {
     "dev": "next dev",
     "build": "next build",

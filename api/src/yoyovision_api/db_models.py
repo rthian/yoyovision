@@ -17,6 +17,7 @@ from yoyovision_ml.domain import (
     AnalysisReviewState,
     DeductionType,
     DifficultyBand,
+    Division,
     EventFamily,
     JobStatus,
     Outcome,
@@ -77,6 +78,9 @@ class VideoAssetORM(Base):
     owner_id: Mapped[str] = mapped_column(
         String(36), ForeignKey("users.id"), index=True, nullable=False
     )
+    division: Mapped[Division] = mapped_column(
+        _str_enum(Division, 4), nullable=False, default=Division.ONE_A
+    )
     original_filename: Mapped[str] = mapped_column(String(512), nullable=False)
     storage_key: Mapped[str] = mapped_column(String(512), nullable=False, unique=True)
     mime_type: Mapped[str] = mapped_column(String(128), nullable=False)
@@ -104,6 +108,9 @@ class AnalysisJobORM(Base):
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
     video_id: Mapped[str] = mapped_column(
         String(36), ForeignKey("video_assets.id"), index=True, nullable=False
+    )
+    division: Mapped[Division] = mapped_column(
+        _str_enum(Division, 4), nullable=False, default=Division.ONE_A
     )
     status: Mapped[JobStatus] = mapped_column(
         _str_enum(JobStatus, 32), nullable=False, default=JobStatus.PENDING
@@ -280,6 +287,9 @@ class JudgingEntryORM(Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
     title: Mapped[str] = mapped_column(String(255), nullable=False)
+    division: Mapped[Division] = mapped_column(
+        _str_enum(Division, 4), nullable=False, default=Division.ONE_A
+    )
     mode: Mapped[JudgingEntryMode] = mapped_column(_str_enum(JudgingEntryMode, 16), nullable=False)
     status: Mapped[JudgingEntryStatus] = mapped_column(
         _str_enum(JudgingEntryStatus, 16), nullable=False, default=JudgingEntryStatus.DRAFT

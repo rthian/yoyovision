@@ -5,18 +5,11 @@ from __future__ import annotations
 from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field
-from yoyovision_ml.pipeline_config import PipelineAdapterConfig
-from yoyovision_api.judging_enums import (
-    AggregationMode,
-    AiMixProfile,
-    JudgeAssignmentStatus,
-    JudgingEntryMode,
-    JudgingEntryStatus,
-)
 from yoyovision_ml.domain import (
     AnalysisReviewState,
     DeductionType,
     DifficultyBand,
+    Division,
     EventFamily,
     JobStatus,
     Outcome,
@@ -25,6 +18,15 @@ from yoyovision_ml.domain import (
     Source,
     VideoStatus,
 )
+from yoyovision_ml.pipeline_config import PipelineAdapterConfig
+
+from yoyovision_api.judging_enums import (
+    AggregationMode,
+    AiMixProfile,
+    JudgeAssignmentStatus,
+    JudgingEntryMode,
+    JudgingEntryStatus,
+)
 
 
 class VideoAssetRead(BaseModel):
@@ -32,6 +34,7 @@ class VideoAssetRead(BaseModel):
 
     id: str
     owner_id: str
+    division: Division
     original_filename: str
     mime_type: str
     duration_ms: int | None
@@ -49,6 +52,7 @@ class AnalysisJobRead(BaseModel):
 
     id: str
     video_id: str
+    division: Division
     status: JobStatus
     progress: float
     current_stage: PipelineStage | None
@@ -275,6 +279,7 @@ class CorpusExportRead(BaseModel):
 class JudgingEntryCreate(BaseModel):
     title: str = Field(min_length=1, max_length=255)
     mode: JudgingEntryMode
+    division: Division = Division.ONE_A
     ruleset_version: str | None = None
     ai_mix_profile: AiMixProfile = AiMixProfile.COMPARE_ONLY
     aggregation_mode: AggregationMode = AggregationMode.AUTO
@@ -343,6 +348,7 @@ class JudgingEntryVideoRead(BaseModel):
 class JudgingEntryRead(BaseModel):
     id: str
     title: str
+    division: Division
     mode: JudgingEntryMode
     status: JudgingEntryStatus
     ruleset_version: str
@@ -401,6 +407,7 @@ class JudgeAccessRead(BaseModel):
     display_name: str
     entry_id: str
     entry_title: str
+    division: Division
     entry_mode: JudgingEntryMode
     entry_status: JudgingEntryStatus
     due_at: datetime | None
@@ -454,6 +461,7 @@ class VideoResults(BaseModel):
 class JudgingEntryResultsRead(BaseModel):
     entry_id: str
     title: str
+    division: Division
     mode: JudgingEntryMode
     status: JudgingEntryStatus
     ai_mix_profile: AiMixProfile

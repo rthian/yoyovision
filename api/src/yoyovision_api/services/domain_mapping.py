@@ -18,6 +18,7 @@ def video_to_domain(video: VideoAssetORM) -> VideoAsset:
     return VideoAsset(
         id=video.id,
         owner_id=video.owner_id,
+        division=video.division,
         original_filename=video.original_filename,
         storage_key=video.storage_key,
         mime_type=video.mime_type,

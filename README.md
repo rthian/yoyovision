@@ -1,9 +1,11 @@
 # YoYoVision
 
-AI-assisted yo-yo freestyle analysis platform. Users upload a 1A freestyle video;
-the system extracts pose/hand/yo-yo tracking, detects atomic trick events on a
-timeline, applies a versioned deterministic scoring ruleset, and produces a
-reviewable, editable scoring report.
+AI-assisted yo-yo freestyle analysis platform with division provenance for 1A,
+2A, 3A, 4A, and 5A. The current automated pipeline is limited to 1A: it extracts
+pose/hand/yo-yo tracking, detects atomic trick events on a timeline, applies a
+versioned deterministic scoring ruleset, and produces a reviewable, editable
+scoring report. Other divisions can be uploaded for manual judging and dataset
+annotation without generating a misleading 1A score.
 
 ## Important product disclaimer
 
@@ -32,7 +34,9 @@ authoritative. See [`docs/ruleset.md`](docs/ruleset.md) for details.
 See [`docs/architecture.md`](docs/architecture.md) for the full module map,
 [`docs/data_model.md`](docs/data_model.md) for every persisted schema and
 ownership/deletion semantics, and [`docs/adapters.md`](docs/adapters.md) for
-how to swap in real model weights.
+how to swap in real model weights. See
+[`docs/multi_division.md`](docs/multi_division.md) for the division rollout
+contract and the model work still required for 2A–5A.
 
 ## Dataset and annotation system
 

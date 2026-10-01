@@ -58,6 +58,8 @@ function event(id: string, startMs: number, endMs: number): AnalysisEvent {
     model_name: "mock",
     model_version: "0",
     evidence_json: { evidence: [] },
+    created_at: "2026-07-21T12:00:00.000Z",
+    updated_at: "2026-07-21T12:00:00.000Z",
   };
 }
 

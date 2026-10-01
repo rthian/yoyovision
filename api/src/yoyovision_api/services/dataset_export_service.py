@@ -101,7 +101,7 @@ async def build_dataset_record(
     dataset_video = DatasetVideo(
         video_id=video.id,
         player_id=f"player-{video.owner_id[:8]}",
-        division="1A",
+        division=video.division,
         relative_path=video.storage_key,
         checksum_sha256=checksum_sha256,
         duration_ms=duration_ms,

@@ -30,6 +30,7 @@ def _entry_to_read(entry: JudgingEntryORM) -> JudgingEntryRead:
     return JudgingEntryRead(
         id=entry.id,
         title=entry.title,
+        division=entry.division,
         mode=entry.mode,
         status=entry.status,
         ruleset_version=entry.ruleset_version,
@@ -100,6 +101,7 @@ async def create_judging_entry(
           admin=admin,
           title=payload.title,
           mode=payload.mode,
+          division=payload.division,
           ruleset_version=payload.ruleset_version or settings.ruleset_version,
           ai_mix_profile=payload.ai_mix_profile,
           aggregation_mode=payload.aggregation_mode,

@@ -62,7 +62,9 @@ export default function JudgePage({ params }: JudgePageProps): JSX.Element {
       <header>
         <p className="text-sm text-content-dim">Judging as {data.display_name}</p>
         <h1 className="text-2xl font-bold text-content-default">{data.entry_title}</h1>
-        <p className="text-sm text-content-dim">Mode: {data.entry_mode}</p>
+        <p className="text-sm text-content-dim">
+          Division: {data.division} · Mode: {data.entry_mode}
+        </p>
       </header>
 
       <section>

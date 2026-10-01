@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-import json
 from pathlib import Path
+
+import pytest
 
 from yoyovision_ml.dataset.corpus import append_record_to_corpus, ensure_corpus_dir
 from yoyovision_ml.dataset.io import load_dataset, load_record
@@ -34,6 +35,13 @@ def _record(record_id: str = "analysis-1__dev_at_yoyovision.local") -> DatasetRe
         deductions=[],
         freestyle_evaluations=[],
     )
+
+
+@pytest.mark.parametrize("division", ["1A", "2A", "3A", "4A", "5A"])
+def test_dataset_video_accepts_championship_divisions(division: str) -> None:
+    payload = _video().model_dump()
+    payload["division"] = division
+    assert DatasetVideo.model_validate(payload).division == division
 
 
 def test_ensure_corpus_dir_creates_manifest_and_subdirs(tmp_path: Path) -> None:

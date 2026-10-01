@@ -13,7 +13,7 @@ import tempfile
 from pathlib import Path
 
 from sqlalchemy.ext.asyncio import AsyncSession
-from yoyovision_ml.domain import VideoStatus
+from yoyovision_ml.domain import Division, VideoStatus
 from yoyovision_ml.interfaces import StoragePort
 
 from yoyovision_api.config import Settings
@@ -34,6 +34,7 @@ async def create_video_from_upload(
     storage: StoragePort,
     settings: Settings,
     owner: User,
+    division: Division,
     original_filename: str,
     declared_mime_type: str,
     file_bytes: bytes,
@@ -64,6 +65,7 @@ async def create_video_from_upload(
 
     video = VideoAssetORM(
         owner_id=owner.id,
+        division=division,
         original_filename=_truncate_filename(original_filename),
         storage_key=storage_key,
         mime_type=declared_mime_type,

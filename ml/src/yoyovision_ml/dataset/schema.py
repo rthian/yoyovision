@@ -20,7 +20,14 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, Field, model_validator
 
-from yoyovision_ml.domain import DeductionType, DifficultyBand, EventFamily, Outcome, Source
+from yoyovision_ml.domain import (
+    DeductionType,
+    DifficultyBand,
+    Division,
+    EventFamily,
+    Outcome,
+    Source,
+)
 
 Fraction = Annotated[float, Field(ge=0.0, le=1.0)]
 #: Freestyle Evaluation categories are judge-entered on a 0-10 scale, matching
@@ -78,7 +85,7 @@ class AnnotationProvenance(BaseModel):
 class DatasetVideo(BaseModel):
     video_id: str
     player_id: str
-    division: Literal["1A"] = "1A"
+    division: Division = Division.ONE_A
     relative_path: str
     checksum_sha256: str
     duration_ms: int = Field(gt=0)

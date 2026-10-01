@@ -5,6 +5,7 @@ import { useRef, useState, type ChangeEvent } from "react";
 import { ApiError } from "@/lib/api-client";
 
 import { useUploadVideo } from "@/hooks/useVideos";
+import { DIVISIONS, type Division } from "@/lib/types";
 
 /** Accepted per MVP scope ("Uploaded MP4, MOV or WebM video"); the API
  * re-validates MIME type and file signature server-side regardless (never
@@ -15,6 +16,7 @@ export function VideoUploadForm(): JSX.Element {
   const uploadVideo = useUploadVideo();
   const inputRef = useRef<HTMLInputElement>(null);
   const [error, setError] = useState<string | null>(null);
+  const [division, setDivision] = useState<Division>("1A");
 
   async function handleFileChange(event: ChangeEvent<HTMLInputElement>): Promise<void> {
     const file = event.target.files?.[0];
@@ -23,7 +25,7 @@ export function VideoUploadForm(): JSX.Element {
     }
     setError(null);
     try {
-      await uploadVideo.mutateAsync(file);
+      await uploadVideo.mutateAsync({ file, division });
     } catch (err) {
       setError(
         err instanceof ApiError
@@ -41,9 +43,24 @@ export function VideoUploadForm(): JSX.Element {
     <div className="flex flex-col gap-2 rounded-m border border-dashed border-outline-default bg-surface-default p-6">
       <label className="flex flex-col gap-2">
         <span className="text-base font-semibold text-content-default">
-          Upload a 1A freestyle video
+          Upload a freestyle video
         </span>
-        <span className="text-sm text-content-dim">MP4, MOV, or WebM. Analysis runs offline.</span>
+        <span className="text-sm text-content-dim">
+          MP4, MOV, or WebM. Automated analysis is currently available for 1A only.
+        </span>
+        <select
+          aria-label="Competition division"
+          value={division}
+          onChange={(event) => setDivision(event.target.value as Division)}
+          disabled={uploadVideo.isPending}
+          className="mt-2 h-10 rounded-s border border-outline-default bg-surface-default px-3 text-sm"
+        >
+          {DIVISIONS.map((value) => (
+            <option key={value} value={value}>
+              {value}
+            </option>
+          ))}
+        </select>
         <input
           ref={inputRef}
           type="file"

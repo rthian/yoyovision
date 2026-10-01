@@ -27,10 +27,13 @@ def _mock_ffprobe(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(security, "probe_video_metadata", lambda path: fake_metadata)
 
 
-async def _upload_video(client: AsyncClient, headers: dict[str, str]) -> str:
+async def _upload_video(
+    client: AsyncClient, headers: dict[str, str], division: str = "1A"
+) -> str:
     response = await client.post(
         "/videos",
         headers=headers,
+        data={"division": division},
         files={"file": ("clip.mp4", _MP4_BODY, "video/mp4")},
     )
     assert response.status_code == 201, response.text
@@ -70,6 +73,7 @@ async def test_admin_can_create_entry_add_judge_and_rotate_invite(
     entry = create.json()
     assert entry["title"] == "Prelims"
     assert len(entry["videos"]) == 1
+    assert entry["division"] == "1A"
 
     invite = await client.post(
         f"/judging-entries/{entry['id']}/judges",
@@ -93,6 +97,24 @@ async def test_admin_can_create_entry_add_judge_and_rotate_invite(
     detail = await client.get(f"/judging-entries/{entry['id']}", headers=admin_headers)
     assert detail.status_code == 200
     assert len(detail.json()["judges"]) == 1
+
+
+async def test_entry_rejects_video_from_a_different_division(
+    client: AsyncClient, admin_headers: dict[str, str]
+) -> None:
+    video_id = await _upload_video(client, admin_headers, division="2A")
+    response = await client.post(
+        "/judging-entries",
+        headers=admin_headers,
+        json={
+            "title": "Wrong division",
+            "division": "3A",
+            "mode": "training",
+            "video_ids": [video_id],
+        },
+    )
+    assert response.status_code == 422
+    assert "entry division is 3A" in response.json()["detail"]
 
 
 async def test_revoked_invite_token_is_inactive(

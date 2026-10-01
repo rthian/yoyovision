@@ -72,7 +72,7 @@ function EntryDetail({ entryId }: { entryId: string }): JSX.Element {
       <header>
         <h1 className="text-2xl font-bold text-content-default">{entry.title}</h1>
         <p className="text-sm text-content-dim">
-          {entry.mode} · {entry.status} · {entry.videos.length} videos
+          {entry.division} · {entry.mode} · {entry.status} · {entry.videos.length} videos
         </p>
         <div className="mt-3 flex flex-wrap gap-3">
           <label className="flex flex-col gap-1 text-xs text-content-dim">

@@ -24,6 +24,21 @@ class VideoStatus(StrEnum):
     DELETED = "deleted"
 
 
+class Division(StrEnum):
+    """IYYF championship freestyle divisions supported by the platform.
+
+    A division is immutable video/analysis provenance. It selects a compatible
+    ontology, model checkpoint, and ruleset; it is never inferred silently by
+    the scoring engine.
+    """
+
+    ONE_A = "1A"
+    TWO_A = "2A"
+    THREE_A = "3A"
+    FOUR_A = "4A"
+    FIVE_A = "5A"
+
+
 class JobStatus(StrEnum):
     PENDING = "pending"
     RUNNING = "running"
@@ -220,6 +235,7 @@ class EvidenceRef:
 class VideoAsset:
     id: str
     owner_id: str
+    division: Division
     original_filename: str
     storage_key: str
     mime_type: str
@@ -237,6 +253,7 @@ class VideoAsset:
 class AnalysisJob:
     id: str
     video_id: str
+    division: Division
     status: JobStatus
     progress: float
     current_stage: PipelineStage | None

@@ -7,6 +7,7 @@ from datetime import UTC, datetime
 from sqlalchemy import inspect as sa_inspect, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
+from yoyovision_ml.domain import Division
 
 from yoyovision_api.db_models import (
     AnalysisJobORM,
@@ -121,6 +122,7 @@ async def create_entry(
     admin: User,
     title: str,
     mode: JudgingEntryMode,
+    division: Division,
     ruleset_version: str,
     ai_mix_profile: AiMixProfile,
     aggregation_mode: AggregationMode,
@@ -135,9 +137,14 @@ async def create_entry(
         video = result.scalar_one_or_none()
         if video is None or video.deleted_at is not None:
             raise JudgingServiceError(f"Video not found: {video_id}")
+        if video.division != division:
+            raise JudgingServiceError(
+                f"Video {video_id} is {video.division.value}; entry division is {division.value}."
+            )
 
     entry = JudgingEntryORM(
         title=title,
+        division=division,
         mode=mode,
         status=JudgingEntryStatus.DRAFT,
         ruleset_version=ruleset_version,
@@ -247,6 +254,11 @@ async def add_videos(
         video = result.scalar_one_or_none()
         if video is None or video.deleted_at is not None:
             raise JudgingServiceError(f"Video not found: {video_id}")
+        if video.division != entry.division:
+            raise JudgingServiceError(
+                f"Video {video_id} is {video.division.value}; entry division is "
+                f"{entry.division.value}."
+            )
         session.add(
             JudgingEntryVideoORM(entry_id=entry.id, video_id=video_id, sort_order=next_order)
         )
