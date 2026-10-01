@@ -168,12 +168,13 @@ def test_youtube_url_parser_accepts_single_video_forms(url: str) -> None:
     assert youtube_import_service.parse_youtube_video_id(url) == "dQw4w9WgXcQ"
 
 
-def test_youtube_format_selector_accepts_video_only_dash_streams() -> None:
+def test_youtube_format_selector_prefers_audio_and_accepts_video_only_dash() -> None:
     """YouTube frequently omits progressive audio+video formats.
 
     Audio is not an input to YoYoVision's visual models, so a valid video-only
     DASH stream must remain importable without an ffmpeg merge step.
     """
     selector = youtube_import_service._YOUTUBE_FORMAT_SELECTOR
+    assert "bestvideo[ext=mp4][vcodec^=avc1][height<=720]+bestaudio[ext=m4a]" in selector
     assert "bestvideo[ext=mp4]" in selector
     assert "bestvideo[ext=webm]" in selector

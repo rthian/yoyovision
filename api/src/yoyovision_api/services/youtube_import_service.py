@@ -15,10 +15,14 @@ _VIDEO_ID_RE = re.compile(r"^[A-Za-z0-9_-]{11}$")
 _YOUTUBE_HOSTS = {"youtube.com", "www.youtube.com", "m.youtube.com", "youtu.be"}
 _YOUTUBE_FORMAT_SELECTOR = "/".join(
     (
-        # Prefer a progressive file when YouTube exposes one. Many current
-        # uploads expose only separate DASH video/audio streams, though, and
-        # YoYoVision's visual analysis does not require an audio track. The
-        # video-only fallbacks avoid requiring ffmpeg just to merge audio.
+        # Most current YouTube uploads expose separate DASH video and audio
+        # streams. Prefer H.264 + M4A so ffmpeg can losslessly remux them into
+        # an MP4 that retains sound in the review UI.
+        "bestvideo[ext=mp4][vcodec^=avc1][height<=720]+bestaudio[ext=m4a]",
+        "bestvideo[ext=mp4][height<=720]+bestaudio[ext=m4a]",
+        "bestvideo[ext=webm][height<=720]+bestaudio[ext=webm]",
+        # Retain progressive and video-only fallbacks for older or unusual
+        # uploads. Audio is not required by the visual analysis pipeline.
         "best[ext=mp4][vcodec!=none][acodec!=none][height<=720]",
         "best[ext=webm][vcodec!=none][acodec!=none][height<=720]",
         "bestvideo[ext=mp4][vcodec^=avc1][height<=720]",
@@ -98,6 +102,7 @@ def _download_sync(
             output_template = str(Path(directory) / "video.%(ext)s")
             options = {
                 "format": _YOUTUBE_FORMAT_SELECTOR,
+                "merge_output_format": "mp4",
                 "outtmpl": output_template,
                 "noplaylist": True,
                 "quiet": True,
