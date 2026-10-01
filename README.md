@@ -38,6 +38,17 @@ how to swap in real model weights. See
 [`docs/multi_division.md`](docs/multi_division.md) for the division rollout
 contract and the model work still required for 2A–5A.
 
+## Training-data workflow
+
+Authorized footage can be uploaded directly or imported from a single YouTube
+video URL. Every video retains its source URL, external video ID, division, and
+rights-confirmation timestamp. On the video page, annotators can mark trick
+start/end times, assign a reusable trick name and element type, record the
+outcome, and label the technical-judge action as positive click, negative
+click, no click, or uncertain. The result exports as a versioned dataset JSON
+record for model training. See
+[`docs/training_data_workflow.md`](docs/training_data_workflow.md).
+
 ## Dataset and annotation system
 
 `ml/src/yoyovision_ml/dataset/` defines a versioned, reproducible dataset

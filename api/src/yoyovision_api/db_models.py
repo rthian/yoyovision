@@ -24,6 +24,8 @@ from yoyovision_ml.domain import (
     PipelineStage,
     ReviewStatus,
     Source,
+    TechnicalCredit,
+    VideoSource,
     VideoStatus,
 )
 
@@ -81,6 +83,15 @@ class VideoAssetORM(Base):
     division: Mapped[Division] = mapped_column(
         _str_enum(Division, 4), nullable=False, default=Division.ONE_A
     )
+    source_type: Mapped[VideoSource] = mapped_column(
+        _str_enum(VideoSource, 16), nullable=False, default=VideoSource.UPLOAD
+    )
+    source_url: Mapped[str | None] = mapped_column(String(2048), nullable=True)
+    source_external_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    player_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    rights_confirmed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     original_filename: Mapped[str] = mapped_column(String(512), nullable=False)
     storage_key: Mapped[str] = mapped_column(String(512), nullable=False, unique=True)
     mime_type: Mapped[str] = mapped_column(String(128), nullable=False)
@@ -98,6 +109,9 @@ class VideoAssetORM(Base):
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     jobs: Mapped[list[AnalysisJobORM]] = relationship(
+        back_populates="video", cascade="all, delete-orphan"
+    )
+    training_annotations: Mapped[list[TrainingAnnotationORM]] = relationship(
         back_populates="video", cascade="all, delete-orphan"
     )
 
@@ -214,6 +228,37 @@ class AnalysisEventORM(Base):
     )
 
     analysis: Mapped[AnalysisJobORM] = relationship(back_populates="events")
+
+
+class TrainingAnnotationORM(Base):
+    """Human-authored division-specific trick label independent of AI scoring."""
+
+    __tablename__ = "training_annotations"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    video_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("video_assets.id", ondelete="CASCADE"),
+        index=True,
+        nullable=False,
+    )
+    created_by: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), nullable=False)
+    division: Mapped[Division] = mapped_column(_str_enum(Division, 4), nullable=False)
+    label: Mapped[str] = mapped_column(String(128), nullable=False)
+    element_type: Mapped[str] = mapped_column(String(64), nullable=False)
+    start_ms: Mapped[int] = mapped_column(Integer, nullable=False)
+    end_ms: Mapped[int] = mapped_column(Integer, nullable=False)
+    outcome: Mapped[Outcome] = mapped_column(_str_enum(Outcome, 16), nullable=False)
+    technical_credit: Mapped[TechnicalCredit] = mapped_column(
+        _str_enum(TechnicalCredit, 24), nullable=False
+    )
+    notes: Mapped[str] = mapped_column(String(2048), nullable=False, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+    video: Mapped[VideoAssetORM] = relationship(back_populates="training_annotations")
 
 
 class MajorDeductionORM(Base):

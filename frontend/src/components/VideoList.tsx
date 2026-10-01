@@ -37,7 +37,8 @@ export function VideoList({ videos }: { videos: VideoAsset[] }): JSX.Element {
               {video.original_filename}
             </Link>
             <span className="text-sm text-content-dim">
-              {video.division} · {STATUS_LABELS[video.status]} - {formatBytes(video.file_size)} -{" "}
+              {video.division} · {video.source_type === "youtube" ? "YouTube" : "Upload"} ·{" "}
+              {STATUS_LABELS[video.status]} - {formatBytes(video.file_size)} -{" "}
               {formatDateTime(video.created_at)}
             </span>
           </div>

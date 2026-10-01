@@ -16,6 +16,13 @@ export type Division = "1A" | "2A" | "3A" | "4A" | "5A";
 
 export const DIVISIONS: Division[] = ["1A", "2A", "3A", "4A", "5A"];
 
+export type VideoSource = "upload" | "youtube";
+export type TechnicalCredit =
+  | "positive_click"
+  | "negative_click"
+  | "no_click"
+  | "uncertain";
+
 export type JobStatus =
   | "pending"
   | "running"
@@ -125,6 +132,11 @@ export interface VideoAsset {
   owner_id: string;
   original_filename: string;
   division: Division;
+  source_type: VideoSource;
+  source_url: string | null;
+  source_external_id: string | null;
+  player_id: string | null;
+  rights_confirmed_at: string | null;
   mime_type: string;
   duration_ms: number | null;
   width: number | null;
@@ -134,6 +146,60 @@ export interface VideoAsset {
   status: VideoStatus;
   created_at: string;
   deleted_at: string | null;
+}
+
+export interface YoutubeImportCreate {
+  url: string;
+  division: Division;
+  player_id: string;
+  rights_confirmed: true;
+}
+
+export interface TrainingAnnotation {
+  id: string;
+  video_id: string;
+  created_by: string;
+  division: Division;
+  label: string;
+  element_type: string;
+  start_ms: number;
+  end_ms: number;
+  outcome: Outcome;
+  technical_credit: TechnicalCredit;
+  notes: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TrainingAnnotationCreate {
+  label: string;
+  element_type: string;
+  start_ms: number;
+  end_ms: number;
+  outcome: Outcome;
+  technical_credit: TechnicalCredit;
+  notes?: string;
+}
+
+export type TrainingAnnotationUpdate = Partial<TrainingAnnotationCreate>;
+
+export interface TrainingRecord {
+  record_id: string;
+  video: {
+    video_id: string;
+    division: Division;
+    source_url: string | null;
+    rights_confirmed: boolean;
+  };
+  trick_events: Array<{
+    event_id: string;
+    label: string;
+    element_type: string | null;
+    start_ms: number;
+    end_ms: number;
+    outcome: Outcome;
+    technical_credit: TechnicalCredit;
+  }>;
 }
 
 export interface PipelineAdapterConfig {

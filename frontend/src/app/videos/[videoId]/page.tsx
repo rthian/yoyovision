@@ -7,6 +7,7 @@ import { AnalysisJobList } from "@/components/AnalysisJobList";
 import { ShadowAdapterPanel } from "@/components/ShadowAdapterPanel";
 import { ShadowComparisonPanel } from "@/components/ShadowComparisonPanel";
 import { AuthGate } from "@/components/AuthGate";
+import { TrainingAnnotationPanel } from "@/components/TrainingAnnotationPanel";
 
 import { useAuth } from "@/hooks/useAuth";
 import {
@@ -51,12 +52,25 @@ function VideoDetail({ videoId }: { videoId: string }): JSX.Element {
       <div>
         <h1 className="text-2xl font-bold text-content-default">{video.original_filename}</h1>
         <p className="mt-1 text-sm text-content-dim">
-          {video.division} · {video.status} - {formatBytes(video.file_size)} - uploaded{" "}
+          {video.division} · performer {video.player_id ?? "not set"} · {video.status} -{" "}
+          {formatBytes(video.file_size)} - uploaded{" "}
           {formatDateTime(video.created_at)}
           {video.width && video.height ? ` - ${video.width}x${video.height}` : ""}
           {video.fps ? ` @ ${video.fps.toFixed(1)}fps` : ""}
         </p>
+        {video.source_url ? (
+          <a
+            href={video.source_url}
+            target="_blank"
+            rel="noreferrer"
+            className="text-sm text-brand-boldest underline"
+          >
+            View source video
+          </a>
+        ) : null}
       </div>
+
+      <TrainingAnnotationPanel videoId={videoId} />
 
       {video.division !== "1A" ? (
         <p className="rounded-s border border-outline-soft bg-surface-alt p-3 text-sm text-content-dim">

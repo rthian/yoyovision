@@ -27,6 +27,7 @@ from yoyovision_ml.domain import (
     EventFamily,
     Outcome,
     Source,
+    TechnicalCredit,
 )
 
 Fraction = Annotated[float, Field(ge=0.0, le=1.0)]
@@ -98,6 +99,8 @@ class DatasetVideo(BaseModel):
     #: true per-frame timing in that case.
     frame_timestamps_ms: list[int] | None = None
     consent_reference: str | None = None
+    source_url: str | None = None
+    rights_confirmed: bool = False
     notes: str = ""
 
     @model_validator(mode="after")
@@ -221,6 +224,8 @@ class TrickEventAnnotation(BaseModel):
     confidence: Fraction = 1.0
     provenance: AnnotationProvenance
     notes: str = ""
+    element_type: str | None = None
+    technical_credit: TechnicalCredit = TechnicalCredit.UNCERTAIN
 
     @model_validator(mode="after")
     def _end_after_start(self) -> TrickEventAnnotation:

@@ -14,6 +14,8 @@ WORKDIR /app
 COPY ml/pyproject.toml ml/
 COPY ml/src ml/src
 COPY api/pyproject.toml api/
+COPY api/alembic.ini api/
+COPY api/alembic api/alembic
 COPY api/src api/src
 
 # Editable installs: docker-compose.yml bind-mounts ./api and ./ml over these

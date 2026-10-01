@@ -35,6 +35,11 @@ import type {
   JudgingEntryStatus,
   JudgingEntryResultsRead,
   Division,
+  TrainingAnnotation,
+  TrainingAnnotationCreate,
+  TrainingAnnotationUpdate,
+  TrainingRecord,
+  YoutubeImportCreate,
 } from "@/lib/types";
 
 const API_BASE_URL =
@@ -180,11 +185,27 @@ export function getVideo(videoId: string): Promise<VideoAsset> {
   return request<VideoAsset>(`/videos/${videoId}`);
 }
 
-export function uploadVideo({ file, division }: { file: File; division: Division }): Promise<VideoAsset> {
+export function uploadVideo({
+  file,
+  division,
+  playerId,
+  rightsConfirmed,
+}: {
+  file: File;
+  division: Division;
+  playerId: string;
+  rightsConfirmed: boolean;
+}): Promise<VideoAsset> {
   const formData = new FormData();
   formData.append("file", file);
   formData.append("division", division);
+  formData.append("player_id", playerId);
+  formData.append("rights_confirmed", String(rightsConfirmed));
   return request<VideoAsset>("/videos", { method: "POST", body: formData });
+}
+
+export function importYoutubeVideo(payload: YoutubeImportCreate): Promise<VideoAsset> {
+  return request<VideoAsset>("/videos/youtube", { method: "POST", jsonBody: payload });
 }
 
 export function deleteVideo(videoId: string, hard = false): Promise<void> {
@@ -217,6 +238,44 @@ export function triggerVideoAnalysis(
 export async function fetchVideoBlobUrl(videoId: string): Promise<string> {
   const { blob } = await requestBlob(`/videos/${videoId}/stream`);
   return URL.createObjectURL(blob);
+}
+
+export function listTrainingAnnotations(videoId: string): Promise<TrainingAnnotation[]> {
+  return request<TrainingAnnotation[]>(`/videos/${videoId}/annotations`);
+}
+
+export function createTrainingAnnotation(
+  videoId: string,
+  payload: TrainingAnnotationCreate
+): Promise<TrainingAnnotation> {
+  return request<TrainingAnnotation>(`/videos/${videoId}/annotations`, {
+    method: "POST",
+    jsonBody: payload,
+  });
+}
+
+export function updateTrainingAnnotation(
+  videoId: string,
+  annotationId: string,
+  payload: TrainingAnnotationUpdate
+): Promise<TrainingAnnotation> {
+  return request<TrainingAnnotation>(`/videos/${videoId}/annotations/${annotationId}`, {
+    method: "PATCH",
+    jsonBody: payload,
+  });
+}
+
+export function deleteTrainingAnnotation(
+  videoId: string,
+  annotationId: string
+): Promise<void> {
+  return request<void>(`/videos/${videoId}/annotations/${annotationId}`, {
+    method: "DELETE",
+  });
+}
+
+export function getTrainingRecord(videoId: string): Promise<TrainingRecord> {
+  return request<TrainingRecord>(`/videos/${videoId}/training-record`);
 }
 
 // --------------------------------------------------------------------------- //

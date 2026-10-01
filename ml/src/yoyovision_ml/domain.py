@@ -39,6 +39,20 @@ class Division(StrEnum):
     FIVE_A = "5A"
 
 
+class VideoSource(StrEnum):
+    UPLOAD = "upload"
+    YOUTUBE = "youtube"
+
+
+class TechnicalCredit(StrEnum):
+    """Human label aligned with competition technical-evaluation clickers."""
+
+    POSITIVE_CLICK = "positive_click"
+    NEGATIVE_CLICK = "negative_click"
+    NO_CLICK = "no_click"
+    UNCERTAIN = "uncertain"
+
+
 class JobStatus(StrEnum):
     PENDING = "pending"
     RUNNING = "running"
@@ -236,6 +250,7 @@ class VideoAsset:
     id: str
     owner_id: str
     division: Division
+    source_type: VideoSource
     original_filename: str
     storage_key: str
     mime_type: str
@@ -247,6 +262,10 @@ class VideoAsset:
     status: VideoStatus
     created_at: datetime
     deleted_at: datetime | None = None
+    source_url: str | None = None
+    source_external_id: str | None = None
+    player_id: str | None = None
+    rights_confirmed_at: datetime | None = None
 
 
 @dataclass(slots=True)

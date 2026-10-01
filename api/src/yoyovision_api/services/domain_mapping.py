@@ -19,6 +19,7 @@ def video_to_domain(video: VideoAssetORM) -> VideoAsset:
         id=video.id,
         owner_id=video.owner_id,
         division=video.division,
+        source_type=video.source_type,
         original_filename=video.original_filename,
         storage_key=video.storage_key,
         mime_type=video.mime_type,
@@ -30,6 +31,10 @@ def video_to_domain(video: VideoAssetORM) -> VideoAsset:
         status=video.status,
         created_at=video.created_at,
         deleted_at=video.deleted_at,
+        source_url=video.source_url,
+        source_external_id=video.source_external_id,
+        player_id=video.player_id,
+        rights_confirmed_at=video.rights_confirmed_at,
     )
 
 

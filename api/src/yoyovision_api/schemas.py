@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 from yoyovision_ml.domain import (
     AnalysisReviewState,
     DeductionType,
@@ -16,6 +17,8 @@ from yoyovision_ml.domain import (
     PipelineStage,
     ReviewStatus,
     Source,
+    TechnicalCredit,
+    VideoSource,
     VideoStatus,
 )
 from yoyovision_ml.pipeline_config import PipelineAdapterConfig
@@ -35,6 +38,11 @@ class VideoAssetRead(BaseModel):
     id: str
     owner_id: str
     division: Division
+    source_type: VideoSource
+    source_url: str | None
+    source_external_id: str | None
+    player_id: str | None
+    rights_confirmed_at: datetime | None
     original_filename: str
     mime_type: str
     duration_ms: int | None
@@ -45,6 +53,65 @@ class VideoAssetRead(BaseModel):
     status: VideoStatus
     created_at: datetime
     deleted_at: datetime | None
+
+
+class YoutubeImportCreate(BaseModel):
+    url: str = Field(min_length=1, max_length=2048)
+    division: Division = Division.ONE_A
+    player_id: str = Field(min_length=1, max_length=128)
+    rights_confirmed: Literal[True]
+
+    @field_validator("player_id")
+    @classmethod
+    def _player_id_must_not_be_blank(cls, value: str) -> str:
+        stripped = value.strip()
+        if not stripped:
+            raise ValueError("player_id must not be blank")
+        return stripped
+
+
+class TrainingAnnotationCreate(BaseModel):
+    label: str = Field(min_length=1, max_length=128)
+    element_type: str = Field(min_length=1, max_length=64)
+    start_ms: int = Field(ge=0)
+    end_ms: int = Field(gt=0)
+    outcome: Outcome
+    technical_credit: TechnicalCredit = TechnicalCredit.UNCERTAIN
+    notes: str = Field(default="", max_length=2048)
+
+    @model_validator(mode="after")
+    def _end_after_start(self) -> TrainingAnnotationCreate:
+        if self.end_ms <= self.start_ms:
+            raise ValueError("end_ms must be greater than start_ms")
+        return self
+
+
+class TrainingAnnotationUpdate(BaseModel):
+    label: str | None = Field(default=None, min_length=1, max_length=128)
+    element_type: str | None = Field(default=None, min_length=1, max_length=64)
+    start_ms: int | None = Field(default=None, ge=0)
+    end_ms: int | None = Field(default=None, gt=0)
+    outcome: Outcome | None = None
+    technical_credit: TechnicalCredit | None = None
+    notes: str | None = Field(default=None, max_length=2048)
+
+
+class TrainingAnnotationRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    video_id: str
+    created_by: str
+    division: Division
+    label: str
+    element_type: str
+    start_ms: int
+    end_ms: int
+    outcome: Outcome
+    technical_credit: TechnicalCredit
+    notes: str
+    created_at: datetime
+    updated_at: datetime
 
 
 class AnalysisJobRead(BaseModel):

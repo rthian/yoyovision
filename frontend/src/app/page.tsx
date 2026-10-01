@@ -3,6 +3,7 @@
 import { AuthGate } from "@/components/AuthGate";
 import { VideoList } from "@/components/VideoList";
 import { VideoUploadForm } from "@/components/VideoUploadForm";
+import { YoutubeImportForm } from "@/components/YoutubeImportForm";
 
 import { useAuth } from "@/hooks/useAuth";
 import { useVideos } from "@/hooks/useVideos";
@@ -16,11 +17,12 @@ function Dashboard(): JSX.Element {
       <div>
         <h1 className="text-2xl font-bold text-content-default">Your videos</h1>
         <p className="mt-1 text-sm text-content-dim">
-          Upload a 1A freestyle to get an atomic trick-event timeline, a
-          deterministic technical score, and a fully editable review report.
+          Upload or import permitted footage, choose its division, and create human labels
+          for model training. Automated analysis remains available for 1A only.
         </p>
       </div>
       <VideoUploadForm />
+      <YoutubeImportForm />
       <div>
         <h2 className="mb-3 text-lg font-semibold text-content-default">Uploads</h2>
         {videosQuery.isLoading ? (
