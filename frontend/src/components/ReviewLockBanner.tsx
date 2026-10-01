@@ -7,6 +7,7 @@ interface ReviewLockBannerProps {
   submittedAt: string | null;
   isSubmitting: boolean;
   isReopening: boolean;
+  unresolvedEventCount?: number;
   onSubmit: () => void;
   onReopen: () => void;
 }
@@ -17,10 +18,12 @@ export function ReviewLockBanner({
   submittedAt,
   isSubmitting,
   isReopening,
+  unresolvedEventCount = 0,
   onSubmit,
   onReopen,
 }: ReviewLockBannerProps): JSX.Element {
   const isLocked = reviewState === "submitted";
+  const canSubmit = unresolvedEventCount === 0;
 
   return (
     <div
@@ -39,7 +42,9 @@ export function ReviewLockBanner({
             ? submittedAt
               ? `Submitted ${new Date(submittedAt).toLocaleString()}. Editing is locked until you reopen.`
               : "Editing is locked until you reopen."
-            : "Submit when you are done reviewing to lock edits and mark the record as adjudicated for export."}
+            : canSubmit
+              ? "All detected events have a decision. Submit to lock edits and mark the record as adjudicated for export."
+              : `Review the remaining ${unresolvedEventCount} event${unresolvedEventCount === 1 ? "" : "s"} before submitting.`}
         </p>
       </div>
       {isLocked ? (
@@ -54,7 +59,7 @@ export function ReviewLockBanner({
       ) : (
         <button
           type="button"
-          disabled={isSubmitting}
+          disabled={isSubmitting || !canSubmit}
           onClick={onSubmit}
           className="shrink-0 rounded-full bg-brand-primary-default px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
         >

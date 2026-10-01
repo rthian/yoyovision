@@ -27,7 +27,8 @@ describe("ExportButtons", () => {
     vi.spyOn(apiClient, "exportReportJson").mockResolvedValue({ blob, filename: "report.json" });
 
     render(<ExportButtons analysisId="analysis-1" />);
-    fireEvent.click(screen.getByRole("button", { name: /Export report \(JSON\)/ }));
+    fireEvent.click(screen.getByRole("button", { name: /^Export/ }));
+    fireEvent.click(screen.getByRole("menuitem", { name: /Export report \(JSON\)/ }));
 
     await waitFor(() => expect(clickSpy).toHaveBeenCalledTimes(1));
     expect(createObjectUrlSpy).toHaveBeenCalledWith(blob);
@@ -39,17 +40,21 @@ describe("ExportButtons", () => {
     vi.spyOn(apiClient, "exportEventsCsv").mockResolvedValue({ blob, filename: null });
 
     render(<ExportButtons analysisId="analysis-1" />);
-    fireEvent.click(screen.getByRole("button", { name: /Export events \(CSV\)/ }));
+    fireEvent.click(screen.getByRole("button", { name: /^Export/ }));
+    fireEvent.click(screen.getByRole("menuitem", { name: /Export events \(CSV\)/ }));
 
     await waitFor(() => expect(clickSpy).toHaveBeenCalledTimes(1));
   });
 
   it("shows the corpus button only for submitted reviews", () => {
     render(<ExportButtons analysisId="analysis-1" reviewState="draft" />);
-    expect(screen.queryByRole("button", { name: /Add to training corpus/ })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /^Export/ }));
+    expect(screen.queryByRole("menuitem", { name: /Add to training corpus/ })).not.toBeInTheDocument();
 
     render(<ExportButtons analysisId="analysis-1" reviewState="submitted" />);
-    expect(screen.getByRole("button", { name: /Add to training corpus/ })).toBeInTheDocument();
+    const exportButtons = screen.getAllByRole("button", { name: /^Export/ });
+    fireEvent.click(exportButtons[exportButtons.length - 1]!);
+    expect(screen.getByRole("menuitem", { name: /Add to training corpus/ })).toBeInTheDocument();
   });
 
   it("disables the other export buttons while one export is pending", async () => {
@@ -62,13 +67,14 @@ describe("ExportButtons", () => {
     );
 
     render(<ExportButtons analysisId="analysis-1" />);
-    fireEvent.click(screen.getByRole("button", { name: /Export deductions \(CSV\)/ }));
+    fireEvent.click(screen.getByRole("button", { name: /^Export/ }));
+    fireEvent.click(screen.getByRole("menuitem", { name: /Export deductions \(CSV\)/ }));
 
-    expect(screen.getByRole("button", { name: /Export report \(JSON\)/ })).toBeDisabled();
+    expect(screen.getByRole("menuitem", { name: /Export report \(JSON\)/ })).toBeDisabled();
 
     resolveExport({ blob: new Blob(["a"]), filename: "deductions.csv" });
     await waitFor(() =>
-      expect(screen.getByRole("button", { name: /Export report \(JSON\)/ })).not.toBeDisabled()
+      expect(screen.getByRole("menuitem", { name: /Export report \(JSON\)/ })).not.toBeDisabled()
     );
   });
 });

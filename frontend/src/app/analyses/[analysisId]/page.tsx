@@ -32,11 +32,22 @@ import { useRuleset, useRulesets } from "@/hooks/useRulesets";
 import { useVideo } from "@/hooks/useVideos";
 import { useVideoBlobUrl } from "@/hooks/useVideoBlobUrl";
 
+type ReviewFilter = "all" | "pending" | "low-confidence" | "uncertain" | "edited";
+
+const REVIEW_FILTER_LABELS: Record<ReviewFilter, string> = {
+  all: "All",
+  pending: "Pending",
+  "low-confidence": "Low confidence",
+  uncertain: "Uncertain",
+  edited: "Edited",
+};
+
 function AnalysisReview({ analysisId }: { analysisId: string }): JSX.Element {
   const { isAuthenticated } = useAuth();
   const [currentMs, setCurrentMs] = useState(0);
   const [seekToMs, setSeekToMs] = useState<number | null>(null);
   const [showFullEventTable, setShowFullEventTable] = useState(false);
+  const [reviewFilter, setReviewFilter] = useState<ReviewFilter>("all");
 
   const jobQuery = useAnalysisJob(analysisId, isAuthenticated);
   const job = jobQuery.data;
@@ -61,6 +72,26 @@ function AnalysisReview({ analysisId }: { analysisId: string }): JSX.Element {
   const updateRuleset = useUpdateAnalysisRuleset(analysisId);
 
   const events = eventsQuery.data ?? [];
+  const reviewedEventCount = events.filter((event) => event.review_status !== "pending").length;
+  const reviewProgress = events.length > 0 ? Math.round((reviewedEventCount / events.length) * 100) : 0;
+  const filterCounts: Record<ReviewFilter, number> = {
+    all: events.length,
+    pending: events.filter((event) => event.review_status === "pending").length,
+    "low-confidence": events.filter((event) => event.confidence < 0.7).length,
+    uncertain: events.filter((event) => event.outcome === "uncertain").length,
+    edited: events.filter((event) => event.review_status === "edited").length,
+  };
+  const filteredEvents = events.filter((event) => {
+    if (reviewFilter === "pending") return event.review_status === "pending";
+    if (reviewFilter === "low-confidence") return event.confidence < 0.7;
+    if (reviewFilter === "uncertain") return event.outcome === "uncertain";
+    if (reviewFilter === "edited") return event.review_status === "edited";
+    return true;
+  });
+  const nextEventNeedingReview = events.find(
+    (event) =>
+      event.review_status === "pending" || event.confidence < 0.7 || event.outcome === "uncertain"
+  );
   const lineItemsByEventId = useMemo(() => {
     const map = new Map<string, TechnicalLineItem>();
     for (const item of lineItemsQuery.data?.technical_line_items ?? []) {
@@ -134,10 +165,38 @@ function AnalysisReview({ analysisId }: { analysisId: string }): JSX.Element {
 
   return (
     <div className="mx-auto flex max-w-5xl flex-col gap-8">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-content-default">Analysis review</h1>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <p className="text-sm font-semibold text-brand-boldest">Review and score</p>
+          <h1 className="text-2xl font-bold text-content-default">Analysis review</h1>
+          <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-content-dim">
+            <span className="rounded-full bg-brand-primary-softest px-2.5 py-1 font-semibold text-brand-boldest">
+              {job.division}
+            </span>
+            <span>{videoQuery.data?.player_id || "Unknown performer"}</span>
+            <span aria-hidden="true">·</span>
+            <span>Pipeline {job.pipeline_version}</span>
+          </div>
+        </div>
         <ExportButtons analysisId={analysisId} reviewState={job.review_state ?? "draft"} />
       </div>
+
+      <nav aria-label="Video workflow" className="rounded-m border border-outline-soft bg-surface-default px-4 py-3">
+        <ol className="grid grid-cols-3 gap-2 text-sm">
+          <li className="flex items-center gap-2 text-status-positive">
+            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-status-positive/15 font-bold">✓</span>
+            <span className="font-semibold">1. Add video</span>
+          </li>
+          <li className="flex items-center gap-2 text-status-positive">
+            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-status-positive/15 font-bold">✓</span>
+            <span className="font-semibold">2. Analyze</span>
+          </li>
+          <li aria-current="step" className="flex items-center gap-2 text-brand-boldest">
+            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-brand-primary-softest font-bold">3</span>
+            <span className="font-semibold">Review</span>
+          </li>
+        </ol>
+      </nav>
 
       {job.is_shadow ? (
         <p
@@ -154,9 +213,71 @@ function AnalysisReview({ analysisId }: { analysisId: string }): JSX.Element {
         submittedAt={job.submitted_at}
         isSubmitting={submitAnalysis.isPending}
         isReopening={reopenAnalysis.isPending}
+        unresolvedEventCount={filterCounts.pending}
         onSubmit={() => void submitAnalysis.mutateAsync()}
         onReopen={() => void reopenAnalysis.mutateAsync()}
       />
+
+      <section className="rounded-m border border-outline-soft bg-surface-default p-4" aria-labelledby="review-progress-heading">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 id="review-progress-heading" className="font-semibold text-content-default">Review progress</h2>
+            <p className="text-sm text-content-dim">
+              {reviewedEventCount} of {events.length} events reviewed
+              {filterCounts.pending > 0 ? ` · ${filterCounts.pending} still need a decision` : " · Ready to submit"}
+            </p>
+          </div>
+          {nextEventNeedingReview && !isLocked ? (
+            <button
+              type="button"
+              onClick={() => {
+                setReviewFilter(
+                  nextEventNeedingReview.review_status === "pending"
+                    ? "pending"
+                    : nextEventNeedingReview.confidence < 0.7
+                      ? "low-confidence"
+                      : "uncertain"
+                );
+                setShowFullEventTable(true);
+                handleSeek(nextEventNeedingReview.start_ms);
+              }}
+              className="shrink-0 rounded-full bg-brand-primary px-4 py-2 text-sm font-semibold text-white"
+            >
+              Review next item
+            </button>
+          ) : null}
+        </div>
+        <div
+          className="mt-3 h-2 overflow-hidden rounded-full bg-outline-softest"
+          role="progressbar"
+          aria-label="Event review progress"
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={reviewProgress}
+        >
+          <div className="h-full rounded-full bg-brand-primary transition-all" style={{ width: `${reviewProgress}%` }} />
+        </div>
+        <div className="mt-4 flex flex-wrap gap-2" aria-label="Filter review events">
+          {(Object.keys(REVIEW_FILTER_LABELS) as ReviewFilter[]).map((filter) => (
+            <button
+              key={filter}
+              type="button"
+              aria-pressed={reviewFilter === filter}
+              onClick={() => {
+                setReviewFilter(filter);
+                setShowFullEventTable(true);
+              }}
+              className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${
+                reviewFilter === filter
+                  ? "border-brand-primary bg-brand-primary-softest text-brand-boldest"
+                  : "border-outline-soft text-content-subtle hover:bg-surface-alt"
+              }`}
+            >
+              {REVIEW_FILTER_LABELS[filter]} · {filterCounts[filter]}
+            </button>
+          ))}
+        </div>
+      </section>
 
       {lineItemsQuery.isError ? (
         <p role="alert" className="rounded-m border border-status-alert/30 bg-status-alert/10 px-4 py-3 text-sm text-status-alert">
@@ -235,12 +356,14 @@ function AnalysisReview({ analysisId }: { analysisId: string }): JSX.Element {
           <div>
             <h2 className="text-lg font-semibold text-content-default">Full event review</h2>
             <p className="text-sm text-content-dim">
-              {events.length} detected events with full editing and review controls
+              {filteredEvents.length === events.length
+                ? `${events.length} detected events with full editing and review controls`
+                : `${filteredEvents.length} of ${events.length} events · ${REVIEW_FILTER_LABELS[reviewFilter]}`}
             </p>
           </div>
           <EventTable
             analysisId={analysisId}
-            events={events}
+            events={filteredEvents}
             lineItemsByEventId={lineItemsByEventId}
             currentMs={currentMs}
             activeEventId={livePreview?.active_event_id ?? null}

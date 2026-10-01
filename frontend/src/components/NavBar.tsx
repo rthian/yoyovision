@@ -15,10 +15,29 @@ export function NavBar(): JSX.Element {
       <Link href="/" className="text-lg font-bold text-brand-boldest">
         YoYoVision
       </Link>
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-2 sm:gap-4">
         {isAuthenticated && !isJudgeRoute ? (
-          <Link href="/admin/judging-entries" className="text-sm font-semibold text-content-subtle">
-            Judging
+          <Link
+            href="/"
+            aria-current={pathname === "/" ? "page" : undefined}
+            className={`rounded-full px-3 py-2 text-sm font-semibold ${
+              pathname === "/" ? "bg-brand-primary-softest text-brand-boldest" : "text-content-subtle hover:bg-surface-alt"
+            }`}
+          >
+            Videos
+          </Link>
+        ) : null}
+        {isAuthenticated && !isJudgeRoute ? (
+          <Link
+            href="/admin/judging-entries"
+            aria-current={pathname.startsWith("/admin/judging-entries") ? "page" : undefined}
+            className={`rounded-full px-3 py-2 text-sm font-semibold ${
+              pathname.startsWith("/admin/judging-entries")
+                ? "bg-brand-primary-softest text-brand-boldest"
+                : "text-content-subtle hover:bg-surface-alt"
+            }`}
+          >
+            Competitions
           </Link>
         ) : null}
         {isAuthenticated && !isJudgeRoute ? (

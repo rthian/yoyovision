@@ -1,9 +1,8 @@
 "use client";
 
 import { AuthGate } from "@/components/AuthGate";
+import { AddVideoPanel } from "@/components/AddVideoPanel";
 import { VideoList } from "@/components/VideoList";
-import { VideoUploadForm } from "@/components/VideoUploadForm";
-import { YoutubeImportForm } from "@/components/YoutubeImportForm";
 
 import { useAuth } from "@/hooks/useAuth";
 import { useVideos } from "@/hooks/useVideos";
@@ -13,7 +12,7 @@ function Dashboard(): JSX.Element {
   const videosQuery = useVideos(isAuthenticated);
 
   return (
-    <div className="mx-auto flex max-w-3xl flex-col gap-8">
+    <div className="mx-auto flex max-w-4xl flex-col gap-8">
       <div>
         <h1 className="text-2xl font-bold text-content-default">Your videos</h1>
         <p className="mt-1 text-sm text-content-dim">
@@ -21,8 +20,7 @@ function Dashboard(): JSX.Element {
           for model training. Automated analysis remains available for 1A only.
         </p>
       </div>
-      <VideoUploadForm />
-      <YoutubeImportForm />
+      <AddVideoPanel />
       <div>
         <h2 className="mb-3 text-lg font-semibold text-content-default">Uploads</h2>
         {videosQuery.isLoading ? (
