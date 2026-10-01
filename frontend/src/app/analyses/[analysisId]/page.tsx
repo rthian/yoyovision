@@ -176,31 +176,79 @@ function AnalysisReview({ analysisId }: { analysisId: string }): JSX.Element {
         </p>
       ) : null}
 
-      <div className="flex flex-col gap-3">
-        <VideoPlayerWithOverlay
-          src={blobUrl}
-          events={events}
-          onTimeUpdateMs={setCurrentMs}
-          seekToMs={seekToMs}
-          routineStartMs={routineWindow?.startMs}
-          routineEndMs={routineWindow?.endMs}
-        />
-        <EventTimeline
-          events={events}
-          durationMs={timelineDurationMs}
-          currentMs={currentMs}
-          onSeek={handleSeek}
-          routineStartMs={routineWindow?.startMs}
-          routineEndMs={routineWindow?.endMs}
-        />
-        {livePreview ? (
-          <LiveScoreStrip
-            preview={livePreview}
-            ruleset={ruleset}
-            activeEventLabel={activeEventLabel}
+      <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,3fr)_minmax(320px,2fr)]">
+        <div className="flex min-w-0 flex-col gap-3">
+          <VideoPlayerWithOverlay
+            src={blobUrl}
+            events={events}
+            onTimeUpdateMs={setCurrentMs}
+            seekToMs={seekToMs}
+            routineStartMs={routineWindow?.startMs}
+            routineEndMs={routineWindow?.endMs}
           />
-        ) : null}
+          <EventTimeline
+            events={events}
+            durationMs={timelineDurationMs}
+            currentMs={currentMs}
+            onSeek={handleSeek}
+            routineStartMs={routineWindow?.startMs}
+            routineEndMs={routineWindow?.endMs}
+          />
+          {livePreview ? (
+            <LiveScoreStrip
+              preview={livePreview}
+              ruleset={ruleset}
+              activeEventLabel={activeEventLabel}
+            />
+          ) : null}
+        </div>
+
+        <section className="flex min-w-0 flex-col gap-3 xl:sticky xl:top-4">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-semibold text-content-default">Trick events</h2>
+              <p className="text-sm text-content-dim">
+                Live feed · {Math.min(8, events.length)} of {events.length}
+              </p>
+            </div>
+            <button
+              type="button"
+              aria-expanded={showFullEventTable}
+              onClick={() => setShowFullEventTable((value) => !value)}
+              className="shrink-0 rounded-full border border-outline-soft bg-surface-default px-3 py-1.5 text-xs font-semibold text-content-default hover:bg-surface-alt"
+            >
+              {showFullEventTable ? "Hide full table" : "View full table"}
+            </button>
+          </div>
+          <CompactEventFeed
+            events={events}
+            lineItemsByEventId={lineItemsByEventId}
+            currentMs={currentMs}
+            activeEventId={livePreview?.active_event_id ?? null}
+            onSeek={handleSeek}
+          />
+        </section>
       </div>
+
+      {showFullEventTable ? (
+        <section className="flex flex-col gap-3">
+          <div>
+            <h2 className="text-lg font-semibold text-content-default">Full event review</h2>
+            <p className="text-sm text-content-dim">
+              {events.length} detected events with full editing and review controls
+            </p>
+          </div>
+          <EventTable
+            analysisId={analysisId}
+            events={events}
+            lineItemsByEventId={lineItemsByEventId}
+            currentMs={currentMs}
+            activeEventId={livePreview?.active_event_id ?? null}
+            onSeek={handleSeek}
+            readOnly={isLocked}
+          />
+        </section>
+      ) : null}
 
       {routineWindow ? (
         <RoutineWindowPanel
@@ -220,46 +268,6 @@ function AnalysisReview({ analysisId }: { analysisId: string }): JSX.Element {
           }}
         />
       ) : null}
-
-      <section className="flex flex-col gap-3">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h2 className="text-lg font-semibold text-content-default">Trick events</h2>
-            <p className="text-sm text-content-dim">
-              {showFullEventTable
-                ? `${events.length} detected events with full review controls`
-                : `Live feed following the playhead · ${Math.min(8, events.length)} of ${events.length} events shown`}
-            </p>
-          </div>
-          <button
-            type="button"
-            aria-expanded={showFullEventTable}
-            onClick={() => setShowFullEventTable((value) => !value)}
-            className="rounded-full border border-outline-soft bg-surface-default px-4 py-2 text-sm font-semibold text-content-default hover:bg-surface-alt"
-          >
-            {showFullEventTable ? "Show compact feed" : `View all ${events.length} events`}
-          </button>
-        </div>
-        {showFullEventTable ? (
-          <EventTable
-            analysisId={analysisId}
-            events={events}
-            lineItemsByEventId={lineItemsByEventId}
-            currentMs={currentMs}
-            activeEventId={livePreview?.active_event_id ?? null}
-            onSeek={handleSeek}
-            readOnly={isLocked}
-          />
-        ) : (
-          <CompactEventFeed
-            events={events}
-            lineItemsByEventId={lineItemsByEventId}
-            currentMs={currentMs}
-            activeEventId={livePreview?.active_event_id ?? null}
-            onSeek={handleSeek}
-          />
-        )}
-      </section>
 
       <section className="flex flex-col gap-3">
         <h2 className="text-lg font-semibold text-content-default">Major deductions</h2>
