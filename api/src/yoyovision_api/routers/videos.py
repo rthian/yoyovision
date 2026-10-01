@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from typing import Annotated
 
-from fastapi import APIRouter, HTTPException, Query, UploadFile, status
+from fastapi import APIRouter, Form, HTTPException, Query, UploadFile, status
 from fastapi.responses import Response
 from sqlalchemy import select
+from yoyovision_ml.domain import Division
 from yoyovision_ml.media_validation import ALLOWED_MIME_TYPES
 
 from yoyovision_api.db_models import AnalysisJobORM, VideoAssetORM
@@ -26,6 +28,7 @@ async def upload_video(
     settings: SettingsDep,
     current_user: CurrentUser,
     file: UploadFile,
+    division: Annotated[Division, Form()] = Division.ONE_A,
 ) -> VideoAssetORM:
     if file.content_type not in ALLOWED_MIME_TYPES:
         raise HTTPException(
@@ -43,6 +46,7 @@ async def upload_video(
             storage=storage,
             settings=settings,
             owner=current_user,
+            division=division,
             original_filename=file.filename or "upload",
             declared_mime_type=file.content_type,
             file_bytes=file_bytes,
@@ -53,7 +57,11 @@ async def upload_video(
             detail={"code": exc.code, "message": exc.message},
         ) from exc
 
-    await create_and_dispatch_analysis_job(session, settings, video)
+    # The current event ontology, model adapters, and draft ruleset are 1A-only.
+    # Keep other divisions available for manual judging and dataset collection
+    # without producing a misleading automated score.
+    if division == Division.ONE_A:
+        await create_and_dispatch_analysis_job(session, settings, video)
     await session.commit()
     return video
 
@@ -147,6 +155,18 @@ async def trigger_video_analysis(
 ) -> AnalysisJobORM:
     """Manually (re-)triggers analysis for a video (e.g. after a failed run,
     or to try a new model version in shadow mode)."""
+    if video.division != Division.ONE_A:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail={
+                "code": "division_analysis_not_supported",
+                "message": (
+                    f"Automated analysis is not yet available for {video.division.value}. "
+                    "The video can still be used for manual judging and dataset annotation."
+                ),
+            },
+        )
+
     job = await create_and_dispatch_analysis_job(
         session,
         settings,

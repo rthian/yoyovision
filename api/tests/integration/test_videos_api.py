@@ -44,6 +44,7 @@ async def test_upload_video_creates_video_and_analysis_job(
     assert response.status_code == 201, response.text
     body = response.json()
     assert body["mime_type"] == "video/mp4"
+    assert body["division"] == "1A"
     assert body["duration_ms"] == 12_000
     assert body["status"] == "ready"
 
@@ -51,6 +52,31 @@ async def test_upload_video_creates_video_and_analysis_job(
     assert analyses.status_code == 200
     assert len(analyses.json()) == 1
     assert analyses.json()[0]["status"] == "pending"
+    assert analyses.json()[0]["division"] == "1A"
+
+
+async def test_non_1a_upload_preserves_division_without_running_1a_analysis(
+    client: AsyncClient, auth_headers: dict[str, str]
+) -> None:
+    response = await client.post(
+        "/videos",
+        headers=auth_headers,
+        data={"division": "2A"},
+        files={"file": ("two-a.mp4", _MP4_BODY, "video/mp4")},
+    )
+    assert response.status_code == 201, response.text
+    body = response.json()
+    assert body["division"] == "2A"
+
+    analyses = await client.get(f"/videos/{body['id']}/analyses", headers=auth_headers)
+    assert analyses.status_code == 200
+    assert analyses.json() == []
+
+    trigger = await client.post(
+        f"/videos/{body['id']}/analyses", headers=auth_headers
+    )
+    assert trigger.status_code == 422
+    assert trigger.json()["detail"]["code"] == "division_analysis_not_supported"
 
 
 async def test_upload_rejects_disallowed_mime_type(

@@ -30,6 +30,7 @@ async def create_and_dispatch_analysis_job(
     """
     job = AnalysisJobORM(
         video_id=video.id,
+        division=video.division,
         status=JobStatus.PENDING,
         progress=0.0,
         current_stage=PipelineStage.QUEUED,

@@ -88,6 +88,7 @@ def _build_access_read(assignment: object) -> JudgeAccessRead:
         display_name=assignment.display_name,
         entry_id=entry.id,
         entry_title=entry.title,
+        division=entry.division,
         entry_mode=entry.mode,
         entry_status=entry.status,
         due_at=entry.due_at,

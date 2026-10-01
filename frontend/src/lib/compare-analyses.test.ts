@@ -55,6 +55,7 @@ describe("compare-analyses", () => {
       {
         id: "shadow",
         video_id: "v1",
+        division: "1A",
         status: "completed",
         progress: 1,
         current_stage: "done",
@@ -76,10 +77,12 @@ describe("compare-analyses", () => {
         review_state: "draft",
         submitted_at: null,
         ruleset_version: "1a-draft-0.1",
+        pipeline_adapter_config: null,
       },
       {
         id: "official",
         video_id: "v1",
+        division: "1A",
         status: "completed",
         progress: 1,
         current_stage: "done",
@@ -101,6 +104,7 @@ describe("compare-analyses", () => {
         review_state: "draft",
         submitted_at: null,
         ruleset_version: "1a-draft-0.1",
+        pipeline_adapter_config: null,
       },
     ];
 

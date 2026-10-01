@@ -8,6 +8,7 @@ function makeJob(overrides: Partial<AnalysisJob> = {}): AnalysisJob {
   return {
     id: "job-1",
     video_id: "video-1",
+    division: "1A",
     status: "pending",
     progress: 0,
     current_stage: "queued",
@@ -29,6 +30,7 @@ function makeJob(overrides: Partial<AnalysisJob> = {}): AnalysisJob {
     review_state: "draft",
     submitted_at: null,
     ruleset_version: "1a-draft-0.1",
+    pipeline_adapter_config: null,
     ...overrides,
   };
 }

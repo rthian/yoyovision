@@ -12,6 +12,10 @@ export type VideoStatus =
   | "rejected"
   | "deleted";
 
+export type Division = "1A" | "2A" | "3A" | "4A" | "5A";
+
+export const DIVISIONS: Division[] = ["1A", "2A", "3A", "4A", "5A"];
+
 export type JobStatus =
   | "pending"
   | "running"
@@ -120,6 +124,7 @@ export interface VideoAsset {
   id: string;
   owner_id: string;
   original_filename: string;
+  division: Division;
   mime_type: string;
   duration_ms: number | null;
   width: number | null;
@@ -145,6 +150,7 @@ export interface PipelineAdapterConfig {
 export interface AnalysisJob {
   id: string;
   video_id: string;
+  division: Division;
   status: JobStatus;
   progress: number;
   current_stage: PipelineStage | null;
@@ -397,6 +403,7 @@ export interface JudgeAccessRead {
   entry_title: string;
   entry_mode: JudgingEntryMode;
   entry_status: JudgingEntryStatus;
+  division: Division;
   due_at: string | null;
   token_expires_at: string;
   videos: JudgeAccessVideo[];
@@ -427,6 +434,7 @@ export interface JudgingEntryRead {
   title: string;
   mode: JudgingEntryMode;
   status: JudgingEntryStatus;
+  division: Division;
   ruleset_version: string;
   ai_mix_profile: string;
   aggregation_mode: string;
@@ -440,6 +448,7 @@ export interface JudgingEntryRead {
 export interface JudgingEntryCreate {
   title: string;
   mode: JudgingEntryMode;
+  division: Division;
   video_ids: string[];
   ruleset_version?: string;
   ai_mix_profile?: string;
@@ -503,6 +512,7 @@ export interface JudgingEntryResultsRead {
   title: string;
   mode: JudgingEntryMode;
   status: JudgingEntryStatus;
+  division: Division;
   ai_mix_profile: string;
   aggregation_mode: string;
   videos: VideoResults[];

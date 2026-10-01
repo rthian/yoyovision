@@ -34,6 +34,7 @@ import type {
   JudgingEntryRead,
   JudgingEntryStatus,
   JudgingEntryResultsRead,
+  Division,
 } from "@/lib/types";
 
 const API_BASE_URL =
@@ -179,9 +180,10 @@ export function getVideo(videoId: string): Promise<VideoAsset> {
   return request<VideoAsset>(`/videos/${videoId}`);
 }
 
-export function uploadVideo(file: File): Promise<VideoAsset> {
+export function uploadVideo({ file, division }: { file: File; division: Division }): Promise<VideoAsset> {
   const formData = new FormData();
   formData.append("file", file);
+  formData.append("division", division);
   return request<VideoAsset>("/videos", { method: "POST", body: formData });
 }
 

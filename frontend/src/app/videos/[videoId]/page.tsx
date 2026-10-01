@@ -51,12 +51,19 @@ function VideoDetail({ videoId }: { videoId: string }): JSX.Element {
       <div>
         <h1 className="text-2xl font-bold text-content-default">{video.original_filename}</h1>
         <p className="mt-1 text-sm text-content-dim">
-          {video.status} - {formatBytes(video.file_size)} - uploaded{" "}
+          {video.division} · {video.status} - {formatBytes(video.file_size)} - uploaded{" "}
           {formatDateTime(video.created_at)}
           {video.width && video.height ? ` - ${video.width}x${video.height}` : ""}
           {video.fps ? ` @ ${video.fps.toFixed(1)}fps` : ""}
         </p>
       </div>
+
+      {video.division !== "1A" ? (
+        <p className="rounded-s border border-outline-soft bg-surface-alt p-3 text-sm text-content-dim">
+          This video is ready for manual judging and dataset annotation. Automated trick
+          analysis is not yet enabled for {video.division}.
+        </p>
+      ) : null}
 
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold text-content-default">Analysis runs</h2>
@@ -78,7 +85,9 @@ function VideoDetail({ videoId }: { videoId: string }): JSX.Element {
                 pipeline_adapter_config: shadowMode ? pipelineAdapterConfig : null,
               })
             }
-            disabled={triggerAnalysis.isPending || video.status !== "ready"}
+            disabled={
+              triggerAnalysis.isPending || video.status !== "ready" || video.division !== "1A"
+            }
             className="rounded-full bg-brand-primary px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
           >
             {triggerAnalysis.isPending ? "Starting..." : "Run analysis"}

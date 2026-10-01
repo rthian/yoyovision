@@ -269,6 +269,7 @@ async def compute_entry_results(session: AsyncSession, entry_id: str) -> Judging
     return JudgingEntryResultsRead(
         entry_id=entry.id,
         title=entry.title,
+        division=entry.division,
         mode=entry.mode,
         status=entry.status,
         ai_mix_profile=entry.ai_mix_profile,
