@@ -10,7 +10,17 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import JSON, Boolean, DateTime, Float, ForeignKey, Integer, String, UniqueConstraint, func
+from sqlalchemy import (
+    JSON,
+    Boolean,
+    DateTime,
+    Float,
+    ForeignKey,
+    Integer,
+    String,
+    UniqueConstraint,
+    func,
+)
 from sqlalchemy import Enum as SAEnum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from yoyovision_ml.domain import (
@@ -35,6 +45,7 @@ from yoyovision_api.judging_enums import (
     AiMixProfile,
     JudgingEntryMode,
     JudgingEntryStatus,
+    TechnicalClickKind,
     UserRole,
 )
 
@@ -176,9 +187,7 @@ class AnalysisJobORM(Base):
     )
     #: Versioned scoring config applied to this analysis. Defaults from API
     #: settings at job creation; judges may switch rulesets during review.
-    ruleset_version: Mapped[str] = mapped_column(
-        String(32), nullable=False, default="1a-draft-0.1"
-    )
+    ruleset_version: Mapped[str] = mapped_column(String(32), nullable=False, default="1a-draft-0.1")
     #: Optional per-job adapter overrides merged over worker env at run time.
     pipeline_adapter_config: Mapped[dict[str, object] | None] = mapped_column(JSON, nullable=True)
 
@@ -356,7 +365,9 @@ class JudgingEntryORM(Base):
     )
 
     videos: Mapped[list[JudgingEntryVideoORM]] = relationship(
-        back_populates="entry", cascade="all, delete-orphan", order_by="JudgingEntryVideoORM.sort_order"
+        back_populates="entry",
+        cascade="all, delete-orphan",
+        order_by="JudgingEntryVideoORM.sort_order",
     )
     judges: Mapped[list[JudgeAssignmentORM]] = relationship(
         back_populates="entry", cascade="all, delete-orphan"
@@ -371,9 +382,7 @@ class JudgingEntryVideoORM(Base):
     entry_id: Mapped[str] = mapped_column(
         String(36), ForeignKey("judging_entries.id", ondelete="CASCADE"), index=True, nullable=False
     )
-    video_id: Mapped[str] = mapped_column(
-        String(36), ForeignKey("video_assets.id"), nullable=False
-    )
+    video_id: Mapped[str] = mapped_column(String(36), ForeignKey("video_assets.id"), nullable=False)
     sort_order: Mapped[int] = mapped_column(Integer, nullable=False)
     official_analysis_id: Mapped[str | None] = mapped_column(
         String(36), ForeignKey("analysis_jobs.id"), nullable=True
@@ -410,6 +419,9 @@ class JudgeAssignmentORM(Base):
     freestyle_scores: Mapped[list[JudgeFreestyleScoreORM]] = relationship(
         back_populates="assignment", cascade="all, delete-orphan"
     )
+    technical_clicks: Mapped[list[JudgeTechnicalClickORM]] = relationship(
+        back_populates="assignment", cascade="all, delete-orphan"
+    )
 
 
 class JudgeFreestyleScoreORM(Base):
@@ -420,7 +432,10 @@ class JudgeFreestyleScoreORM(Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
     assignment_id: Mapped[str] = mapped_column(
-        String(36), ForeignKey("judge_assignments.id", ondelete="CASCADE"), index=True, nullable=False
+        String(36),
+        ForeignKey("judge_assignments.id", ondelete="CASCADE"),
+        index=True,
+        nullable=False,
     )
     entry_video_id: Mapped[str] = mapped_column(
         String(36), ForeignKey("judging_entry_videos.id", ondelete="CASCADE"), nullable=False
@@ -441,4 +456,32 @@ class JudgeFreestyleScoreORM(Base):
     )
 
     assignment: Mapped[JudgeAssignmentORM] = relationship(back_populates="freestyle_scores")
+    entry_video: Mapped[JudgingEntryVideoORM] = relationship()
+
+
+class JudgeTechnicalClickORM(Base):
+    """Timestamped human technical-judge action for later audit and comparison."""
+
+    __tablename__ = "judge_technical_clicks"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    assignment_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("judge_assignments.id", ondelete="CASCADE"),
+        index=True,
+        nullable=False,
+    )
+    entry_video_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("judging_entry_videos.id", ondelete="CASCADE"),
+        index=True,
+        nullable=False,
+    )
+    timestamp_ms: Mapped[int] = mapped_column(Integer, nullable=False)
+    kind: Mapped[TechnicalClickKind] = mapped_column(
+        _str_enum(TechnicalClickKind, 16), nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    assignment: Mapped[JudgeAssignmentORM] = relationship(back_populates="technical_clicks")
     entry_video: Mapped[JudgingEntryVideoORM] = relationship()

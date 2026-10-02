@@ -4,7 +4,8 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
-from sqlalchemy import inspect as sa_inspect, select
+from sqlalchemy import inspect as sa_inspect
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from yoyovision_ml.domain import Division
@@ -13,6 +14,7 @@ from yoyovision_api.db_models import (
     AnalysisJobORM,
     JudgeAssignmentORM,
     JudgeFreestyleScoreORM,
+    JudgeTechnicalClickORM,
     JudgingEntryORM,
     JudgingEntryVideoORM,
     User,
@@ -24,8 +26,9 @@ from yoyovision_api.judging_enums import (
     JudgeAssignmentStatus,
     JudgingEntryMode,
     JudgingEntryStatus,
+    TechnicalClickKind,
 )
-from yoyovision_api.schemas import JudgeFreestyleScoreUpsert
+from yoyovision_api.schemas import JudgeFreestyleScoreUpsert, JudgeTechnicalClickCreate
 from yoyovision_api.services.invite_token import (
     generate_invite_token,
     hash_token,
@@ -64,7 +67,8 @@ class JudgingAccessError(JudgingServiceError):
 def _assignment_status(assignment: JudgeAssignmentORM) -> JudgeAssignmentStatus:
     if assignment.revoked_at is not None:
         return JudgeAssignmentStatus.PENDING
-    if "freestyle_scores" in sa_inspect(assignment).unloaded:
+    unloaded = sa_inspect(assignment).unloaded
+    if "freestyle_scores" in unloaded or "technical_clicks" in unloaded:
         return JudgeAssignmentStatus.PENDING
     scores = assignment.freestyle_scores
     if scores and all(score.is_submitted for score in scores):
@@ -81,6 +85,8 @@ def _assignment_status(assignment: JudgeAssignmentORM) -> JudgeAssignmentStatus:
         or score.notes
         for score in scores
     ):
+        return JudgeAssignmentStatus.IN_PROGRESS
+    if assignment.technical_clicks:
         return JudgeAssignmentStatus.IN_PROGRESS
     return JudgeAssignmentStatus.PENDING
 
@@ -104,6 +110,21 @@ def _score_for_video(
         if score.entry_video_id == entry_video_id:
             return score
     return None
+
+
+def _clicks_for_video(
+    assignment: JudgeAssignmentORM, entry_video_id: str
+) -> list[JudgeTechnicalClickORM]:
+    return sorted(
+        (click for click in assignment.technical_clicks if click.entry_video_id == entry_video_id),
+        key=lambda click: (click.timestamp_ms, click.created_at),
+    )
+
+
+def _assert_video_score_open(assignment: JudgeAssignmentORM, entry_video_id: str) -> None:
+    score = _score_for_video(assignment, entry_video_id)
+    if score is not None and score.is_submitted:
+        raise JudgingAccessError("Scores already submitted.")
 
 
 def _apply_fe_payload(score: JudgeFreestyleScoreORM, payload: JudgeFreestyleScoreUpsert) -> None:
@@ -157,9 +178,7 @@ async def create_entry(
     await session.flush()
 
     for index, video_id in enumerate(video_ids):
-        session.add(
-            JudgingEntryVideoORM(entry_id=entry.id, video_id=video_id, sort_order=index)
-        )
+        session.add(JudgingEntryVideoORM(entry_id=entry.id, video_id=video_id, sort_order=index))
 
     await session.commit()
     return await get_entry(session, entry.id)
@@ -179,6 +198,7 @@ async def get_entry(session: AsyncSession, entry_id: str) -> JudgingEntryORM:
         .options(
             selectinload(JudgingEntryORM.videos).selectinload(JudgingEntryVideoORM.video),
             selectinload(JudgingEntryORM.judges).selectinload(JudgeAssignmentORM.freestyle_scores),
+            selectinload(JudgingEntryORM.judges).selectinload(JudgeAssignmentORM.technical_clicks),
         )
     )
     entry = result.scalar_one_or_none()
@@ -200,18 +220,25 @@ async def update_entry(
     due_at: datetime | None = None,
     clear_due_at: bool = False,
 ) -> JudgingEntryORM:
-    if entry.status == JudgingEntryStatus.LOCKED and status != JudgingEntryStatus.LOCKED:
-        if any(
-            value is not None
-            for value in (
-                title,
-                mode,
-                ruleset_version,
-                ai_mix_profile,
-                aggregation_mode,
+    if (
+        entry.status == JudgingEntryStatus.LOCKED
+        and status != JudgingEntryStatus.LOCKED
+        and (
+            any(
+                value is not None
+                for value in (
+                    title,
+                    mode,
+                    ruleset_version,
+                    ai_mix_profile,
+                    aggregation_mode,
+                )
             )
-        ) or clear_due_at or due_at is not None:
-            raise JudgingServiceError("Locked entries cannot be edited.")
+            or clear_due_at
+            or due_at is not None
+        )
+    ):
+        raise JudgingServiceError("Locked entries cannot be edited.")
 
     if title is not None:
         entry.title = title
@@ -288,9 +315,7 @@ async def link_entry_video_analyses(
 async def _validate_analysis_for_video(
     session: AsyncSession, analysis_id: str, video_id: str
 ) -> None:
-    result = await session.execute(
-        select(AnalysisJobORM).where(AnalysisJobORM.id == analysis_id)
-    )
+    result = await session.execute(select(AnalysisJobORM).where(AnalysisJobORM.id == analysis_id))
     job = result.scalar_one_or_none()
     if job is None or job.video_id != video_id:
         raise JudgingServiceError("Analysis does not belong to this video.")
@@ -323,9 +348,7 @@ async def add_judge(
     return assignment, raw_token
 
 
-async def rotate_judge_token(
-    session: AsyncSession, assignment: JudgeAssignmentORM
-) -> str:
+async def rotate_judge_token(session: AsyncSession, assignment: JudgeAssignmentORM) -> str:
     raw_token, token_hash, token_prefix = generate_invite_token()
     assignment.invite_token_hash = token_hash
     assignment.token_prefix = token_prefix
@@ -340,9 +363,7 @@ async def revoke_judge(session: AsyncSession, assignment: JudgeAssignmentORM) ->
     await session.commit()
 
 
-async def resolve_assignment_by_token(
-    session: AsyncSession, raw_token: str
-) -> JudgeAssignmentORM:
+async def resolve_assignment_by_token(session: AsyncSession, raw_token: str) -> JudgeAssignmentORM:
     token_hash = hash_token(raw_token)
     result = await session.execute(
         select(JudgeAssignmentORM)
@@ -352,6 +373,7 @@ async def resolve_assignment_by_token(
             .selectinload(JudgingEntryORM.videos)
             .selectinload(JudgingEntryVideoORM.video),
             selectinload(JudgeAssignmentORM.freestyle_scores),
+            selectinload(JudgeAssignmentORM.technical_clicks),
         )
     )
     assignment = result.scalar_one_or_none()
@@ -374,6 +396,54 @@ async def get_entry_video_for_assignment(
         if entry_video.id == entry_video_id:
             return entry_video
     raise JudgingAccessError("Video not found.")
+
+
+async def add_technical_click(
+    session: AsyncSession,
+    assignment: JudgeAssignmentORM,
+    entry_video_id: str,
+    payload: JudgeTechnicalClickCreate,
+) -> JudgeTechnicalClickORM:
+    _assert_entry_writable(assignment.entry)
+    entry_video = await get_entry_video_for_assignment(assignment, entry_video_id)
+    _assert_video_score_open(assignment, entry_video_id)
+    duration_ms = entry_video.video.duration_ms or 0
+    if duration_ms > 0 and payload.timestamp_ms > duration_ms:
+        raise JudgingAccessError("Technical click timestamp exceeds video duration.")
+
+    click = JudgeTechnicalClickORM(
+        assignment_id=assignment.id,
+        entry_video_id=entry_video_id,
+        timestamp_ms=payload.timestamp_ms,
+        kind=TechnicalClickKind(payload.kind),
+    )
+    session.add(click)
+    await session.commit()
+    await session.refresh(click)
+    return click
+
+
+async def delete_technical_click(
+    session: AsyncSession,
+    assignment: JudgeAssignmentORM,
+    entry_video_id: str,
+    click_id: str,
+) -> None:
+    _assert_entry_writable(assignment.entry)
+    await get_entry_video_for_assignment(assignment, entry_video_id)
+    _assert_video_score_open(assignment, entry_video_id)
+    result = await session.execute(
+        select(JudgeTechnicalClickORM).where(
+            JudgeTechnicalClickORM.id == click_id,
+            JudgeTechnicalClickORM.assignment_id == assignment.id,
+            JudgeTechnicalClickORM.entry_video_id == entry_video_id,
+        )
+    )
+    click = result.scalar_one_or_none()
+    if click is None:
+        raise JudgingAccessError("Technical click not found.")
+    await session.delete(click)
+    await session.commit()
 
 
 async def upsert_judge_fe(

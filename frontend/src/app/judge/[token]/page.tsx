@@ -1,11 +1,14 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useRef, useState } from "react";
 
 import { JudgeFreestyleForm } from "@/components/JudgeFreestyleForm";
+import { JudgeTechnicalClicker } from "@/components/JudgeTechnicalClicker";
 import { ApiError } from "@/lib/api-client";
 import {
   useJudgeAccess,
+  useAddJudgeTechnicalClick,
+  useDeleteJudgeTechnicalClick,
   useSubmitJudgeFe,
   useUpsertJudgeFe,
 } from "@/hooks/useJudgeAccess";
@@ -20,17 +23,16 @@ export default function JudgePage({ params }: JudgePageProps): JSX.Element {
   const accessQuery = useJudgeAccess(token);
   const videos = accessQuery.data?.videos ?? [];
   const [selectedVideoId, setSelectedVideoId] = useState<string | undefined>();
+  const [currentMs, setCurrentMs] = useState(0);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
 
-  const activeVideoId = useMemo(() => {
-    if (selectedVideoId) {
-      return selectedVideoId;
-    }
-    return videos[0]?.entry_video_id;
-  }, [selectedVideoId, videos]);
+  const activeVideoId = selectedVideoId ?? videos[0]?.entry_video_id;
 
   const activeVideo = videos.find((video) => video.entry_video_id === activeVideoId);
   const upsert = useUpsertJudgeFe(token, activeVideoId ?? "");
   const submit = useSubmitJudgeFe(token, activeVideoId ?? "");
+  const addTechnicalClick = useAddJudgeTechnicalClick(token, activeVideoId ?? "");
+  const deleteTechnicalClick = useDeleteJudgeTechnicalClick(token, activeVideoId ?? "");
   const videoBlob = useJudgeVideoBlobUrl(token, activeVideoId, Boolean(activeVideoId));
 
   if (accessQuery.isLoading) {
@@ -106,8 +108,29 @@ export default function JudgePage({ params }: JudgePageProps): JSX.Element {
               Could not load video.
             </p>
           ) : videoBlob.blobUrl ? (
-            <video controls src={videoBlob.blobUrl} className="w-full rounded-m bg-black" />
+            <video
+              ref={videoRef}
+              controls
+              src={videoBlob.blobUrl}
+              onTimeUpdate={(event) => setCurrentMs(Math.round(event.currentTarget.currentTime * 1000))}
+              onSeeked={(event) => setCurrentMs(Math.round(event.currentTarget.currentTime * 1000))}
+              className="w-full rounded-m bg-black"
+            />
           ) : null}
+
+          <JudgeTechnicalClicker
+            clicks={activeVideo.my_technical_clicks}
+            currentMs={currentMs}
+            readOnly={activeVideo.my_score?.is_submitted ?? false}
+            isSaving={addTechnicalClick.isPending || deleteTechnicalClick.isPending}
+            onClick={(kind) =>
+              addTechnicalClick.mutate({
+                kind,
+                timestamp_ms: Math.round((videoRef.current?.currentTime ?? 0) * 1000),
+              })
+            }
+            onUndo={(clickId) => deleteTechnicalClick.mutate(clickId)}
+          />
 
           <JudgeFreestyleForm
             score={activeVideo.my_score}

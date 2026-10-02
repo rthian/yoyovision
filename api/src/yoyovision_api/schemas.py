@@ -29,6 +29,7 @@ from yoyovision_api.judging_enums import (
     JudgeAssignmentStatus,
     JudgingEntryMode,
     JudgingEntryStatus,
+    TechnicalClickKind,
 )
 
 
@@ -460,6 +461,20 @@ class JudgeFreestyleScoreUpsert(BaseModel):
     notes: str = Field(default="", max_length=4096)
 
 
+class JudgeTechnicalClickCreate(BaseModel):
+    timestamp_ms: int = Field(ge=0)
+    kind: TechnicalClickKind
+
+
+class JudgeTechnicalClickRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    timestamp_ms: int
+    kind: TechnicalClickKind
+    created_at: datetime
+
+
 class JudgeAccessVideoRead(BaseModel):
     entry_video_id: str
     sort_order: int
@@ -467,6 +482,7 @@ class JudgeAccessVideoRead(BaseModel):
     duration_ms: int | None
     mime_type: str | None
     my_score: JudgeFreestyleScoreRead | None
+    my_technical_clicks: list[JudgeTechnicalClickRead]
 
 
 class JudgeAccessRead(BaseModel):
@@ -505,6 +521,10 @@ class JudgeResultRow(BaseModel):
     included_in_aggregate: bool
     scores: FeCategoryScores
     notes: str
+    positive_clicks: int
+    negative_clicks: int
+    net_technical_clicks: int
+    technical_clicks: list[JudgeTechnicalClickRead]
 
 
 class VideoResults(BaseModel):
@@ -523,6 +543,8 @@ class VideoResults(BaseModel):
     ai_virtual_judge_included: bool
     effective_aggregation_mode: str
     warnings: list[str]
+    panel_net_technical_clicks: float | None
+    technical_click_range: int | None
 
 
 class JudgingEntryResultsRead(BaseModel):
@@ -535,3 +557,20 @@ class JudgingEntryResultsRead(BaseModel):
     aggregation_mode: AggregationMode
     videos: list[VideoResults]
     warnings: list[str]
+
+
+class HumanJudgingEntryReference(BaseModel):
+    entry_id: str
+    title: str
+    mode: JudgingEntryMode
+    status: JudgingEntryStatus
+    judges: list[JudgeResultRow]
+    panel_net_technical_clicks: float | None
+    technical_click_range: int | None
+    panel_freestyle: FeCategoryScores
+
+
+class AnalysisHumanJudgingReferenceRead(BaseModel):
+    analysis_id: str
+    video_id: str
+    entries: list[HumanJudgingEntryReference]

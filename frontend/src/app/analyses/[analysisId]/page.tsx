@@ -13,6 +13,7 @@ import { EventTimeline } from "@/components/EventTimeline";
 import { ExportButtons } from "@/components/ExportButtons";
 import { FreestyleEvaluationForm } from "@/components/FreestyleEvaluationForm";
 import { LiveScoreStrip } from "@/components/LiveScoreStrip";
+import { HumanJudgingReferencePanel } from "@/components/HumanJudgingReferencePanel";
 import { ReviewLockBanner } from "@/components/ReviewLockBanner";
 import { RoutineWindowPanel } from "@/components/RoutineWindowPanel";
 import { RulesetPicker } from "@/components/RulesetPicker";
@@ -377,6 +378,8 @@ function AnalysisReview({ analysisId }: { analysisId: string }): JSX.Element {
         modelVersions={job.model_versions}
         onSeek={handleSeek}
       />
+
+      <HumanJudgingReferencePanel analysisId={analysisId} onSeek={handleSeek} />
 
       {showFullEventTable ? (
         <section className="flex flex-col gap-3">

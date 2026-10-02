@@ -453,6 +453,15 @@ export interface JudgeFreestyleScore {
 
 export type JudgeFreestyleScoreUpsert = FreestyleEvaluationUpsert;
 
+export type TechnicalClickKind = "positive" | "negative";
+
+export interface JudgeTechnicalClick {
+  id: string;
+  timestamp_ms: number;
+  kind: TechnicalClickKind;
+  created_at: string;
+}
+
 export interface JudgeAccessVideo {
   entry_video_id: string;
   sort_order: number;
@@ -460,6 +469,7 @@ export interface JudgeAccessVideo {
   duration_ms: number | null;
   mime_type: string | null;
   my_score: JudgeFreestyleScore | null;
+  my_technical_clicks: JudgeTechnicalClick[];
 }
 
 export interface JudgeAccessRead {
@@ -553,6 +563,10 @@ export interface JudgeResultRow {
   included_in_aggregate: boolean;
   scores: FeCategoryScores;
   notes: string;
+  positive_clicks: number;
+  negative_clicks: number;
+  net_technical_clicks: number;
+  technical_clicks: JudgeTechnicalClick[];
 }
 
 export interface VideoResults {
@@ -571,6 +585,8 @@ export interface VideoResults {
   ai_virtual_judge_included: boolean;
   effective_aggregation_mode: string;
   warnings: string[];
+  panel_net_technical_clicks: number | null;
+  technical_click_range: number | null;
 }
 
 export interface JudgingEntryResultsRead {
@@ -583,6 +599,23 @@ export interface JudgingEntryResultsRead {
   aggregation_mode: string;
   videos: VideoResults[];
   warnings: string[];
+}
+
+export interface HumanJudgingEntryReference {
+  entry_id: string;
+  title: string;
+  mode: JudgingEntryMode;
+  status: JudgingEntryStatus;
+  judges: JudgeResultRow[];
+  panel_net_technical_clicks: number | null;
+  technical_click_range: number | null;
+  panel_freestyle: FeCategoryScores;
+}
+
+export interface AnalysisHumanJudgingReference {
+  analysis_id: string;
+  video_id: string;
+  entries: HumanJudgingEntryReference[];
 }
 
 export const FE_CATEGORY_COLUMNS: { key: keyof FeCategoryScores; label: string }[] = [

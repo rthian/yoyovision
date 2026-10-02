@@ -40,6 +40,9 @@ import type {
   TrainingAnnotationUpdate,
   TrainingRecord,
   YoutubeImportCreate,
+  JudgeTechnicalClick,
+  TechnicalClickKind,
+  AnalysisHumanJudgingReference,
 } from "@/lib/types";
 
 const API_BASE_URL =
@@ -581,6 +584,38 @@ export function submitJudgeFe(
     method: "POST",
     jsonBody: payload,
   });
+}
+
+export function addJudgeTechnicalClick(
+  token: string,
+  entryVideoId: string,
+  payload: { timestamp_ms: number; kind: TechnicalClickKind }
+): Promise<JudgeTechnicalClick> {
+  return judgeRequest<JudgeTechnicalClick>(
+    token,
+    `/videos/${entryVideoId}/technical-clicks`,
+    { method: "POST", jsonBody: payload }
+  );
+}
+
+export function deleteJudgeTechnicalClick(
+  token: string,
+  entryVideoId: string,
+  clickId: string
+): Promise<void> {
+  return judgeRequest<void>(
+    token,
+    `/videos/${entryVideoId}/technical-clicks/${clickId}`,
+    { method: "DELETE" }
+  );
+}
+
+export function getAnalysisHumanJudgingReference(
+  analysisId: string
+): Promise<AnalysisHumanJudgingReference> {
+  return request<AnalysisHumanJudgingReference>(
+    `/analyses/${analysisId}/human-judging-reference`
+  );
 }
 
 export async function fetchJudgeVideoBlobUrl(

@@ -13,16 +13,21 @@ from yoyovision_ml.ruleset import get_ruleset_by_version
 from yoyovision_api.db_models import AnalysisJobORM, ScoreBreakdownORM, VideoAssetORM
 from yoyovision_api.deps import CurrentUser, DbSession, OwnedJob, SettingsDep
 from yoyovision_api.schemas import (
+    AnalysisHumanJudgingReferenceRead,
     AnalysisJobRead,
-    RoutineWindowUpdate,
     PipelineAdapterConfigUpdate,
+    RoutineWindowUpdate,
     RulesetVersionUpdate,
     ScoreBreakdownRead,
     ScoreLineItemsRead,
     ScorePreviewRead,
     TechnicalLineItemRead,
 )
-from yoyovision_api.services.review_guard import ensure_analysis_editable, ensure_analysis_submittable
+from yoyovision_api.services.judging_results_service import compute_analysis_human_reference
+from yoyovision_api.services.review_guard import (
+    ensure_analysis_editable,
+    ensure_analysis_submittable,
+)
 from yoyovision_api.services.scoring_service import (
     compute_score_line_items,
     compute_score_preview,
@@ -39,6 +44,21 @@ _TERMINAL_STATUSES = frozenset({JobStatus.COMPLETED, JobStatus.FAILED, JobStatus
 @router.get("/{analysis_id}", response_model=AnalysisJobRead)
 async def get_analysis(job: OwnedJob) -> AnalysisJobORM:
     return job
+
+
+@router.get(
+    "/{analysis_id}/human-judging-reference",
+    response_model=AnalysisHumanJudgingReferenceRead,
+)
+async def get_human_judging_reference(
+    job: OwnedJob,
+    session: DbSession,
+) -> AnalysisHumanJudgingReferenceRead:
+    return await compute_analysis_human_reference(
+        session,
+        analysis_id=job.id,
+        video_id=job.video_id,
+    )
 
 
 @router.post("/{analysis_id}/cancel", response_model=AnalysisJobRead)
@@ -59,7 +79,9 @@ async def cancel_analysis(job: OwnedJob, session: DbSession) -> AnalysisJobORM:
 async def get_score(job: OwnedJob, session: DbSession, settings: SettingsDep) -> ScoreBreakdownORM:
     """Returns the current score, recomputing it from current DB state first
     so the returned breakdown always reflects the latest human edits."""
-    breakdown = await recompute_score(session, job, job_ruleset_version(job, settings.ruleset_version))
+    breakdown = await recompute_score(
+        session, job, job_ruleset_version(job, settings.ruleset_version)
+    )
     await session.commit()
     return breakdown
 
@@ -69,7 +91,9 @@ async def get_score_line_items(
     job: OwnedJob, session: DbSession, settings: SettingsDep
 ) -> ScoreLineItemsRead:
     """Returns per-event technical credit rows for the review UI."""
-    technical_raw, items = await compute_score_line_items(session, job, job_ruleset_version(job, settings.ruleset_version))
+    technical_raw, items = await compute_score_line_items(
+        session, job, job_ruleset_version(job, settings.ruleset_version)
+    )
     return ScoreLineItemsRead(
         technical_raw=technical_raw,
         technical_line_items=[TechnicalLineItemRead.model_validate(item) for item in items],
@@ -86,17 +110,16 @@ async def get_score_preview(
     """Returns a playhead-gated score: tricks credit only after `end_ms`, and
     deductions apply only once `timestamp_ms` has passed."""
     if up_to_ms < 0:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="up_to_ms must be >= 0")
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="up_to_ms must be >= 0",
+        )
 
     breakdown, event_rows, completed_count = await compute_score_preview(
         session, job, job_ruleset_version(job, settings.ruleset_version), up_to_ms
     )
     active_event_id = next(
-        (
-            row.id
-            for row in event_rows
-            if row.start_ms <= up_to_ms <= row.end_ms
-        ),
+        (row.id for row in event_rows if row.start_ms <= up_to_ms <= row.end_ms),
         None,
     )
     return ScorePreviewRead(
@@ -122,7 +145,9 @@ async def recompute_analysis_score(
     """Explicit recompute endpoint (same effect as `GET .../score`, exposed
     separately so review-UI "Recalculate score" actions are self-documenting
     and show up distinctly in server logs/audit trails)."""
-    breakdown = await recompute_score(session, job, job_ruleset_version(job, settings.ruleset_version))
+    breakdown = await recompute_score(
+        session, job, job_ruleset_version(job, settings.ruleset_version)
+    )
     await session.commit()
     return breakdown
 
@@ -197,8 +222,6 @@ async def reopen_analysis(job: OwnedJob, session: DbSession) -> AnalysisJobORM:
     await session.commit()
     await session.refresh(job)
     return job
-
-
 
 
 @router.patch("/{analysis_id}/pipeline-config", response_model=AnalysisJobRead)

@@ -6,12 +6,13 @@ from fastapi import APIRouter, HTTPException, Request, status
 from fastapi.responses import Response
 
 from yoyovision_api.deps import DbSession, SettingsDep, StorageDep
-from yoyovision_api.judging_enums import JudgingEntryStatus
 from yoyovision_api.schemas import (
     JudgeAccessRead,
     JudgeAccessVideoRead,
     JudgeFreestyleScoreRead,
     JudgeFreestyleScoreUpsert,
+    JudgeTechnicalClickCreate,
+    JudgeTechnicalClickRead,
 )
 from yoyovision_api.services import judging_service
 from yoyovision_api.services.judge_rate_limit import JudgeRateLimitExceeded, check_judge_rate_limit
@@ -19,15 +20,28 @@ from yoyovision_api.services.judge_rate_limit import JudgeRateLimitExceeded, che
 router = APIRouter(prefix="/judge-access", tags=["judge-access"])
 
 
-def _rate_limit_key(request: Request, token: str) -> str:
+def _rate_limit_key(request: Request, token: str, *, clicker: bool) -> str:
     client = request.client.host if request.client else "unknown"
-    return f"{client}:{token[:8]}"
+    bucket = "technical-clicks" if clicker else "judge-access"
+    return f"{client}:{token[:8]}:{bucket}"
 
 
-def _check_rate_limit(request: Request, token: str, settings: object) -> None:
-    limit = min(getattr(settings, "api_rate_limit_per_minute", 60), 30)
+def _check_rate_limit(
+    request: Request,
+    token: str,
+    settings: object,
+    *,
+    clicker: bool = False,
+) -> None:
+    # A live technical judge can legitimately record several clicks per second.
+    # Keep ordinary invite endpoints strict while giving the token-scoped clicker
+    # enough headroom for competition use.
+    limit = 600 if clicker else min(getattr(settings, "api_rate_limit_per_minute", 60), 30)
     try:
-        check_judge_rate_limit(_rate_limit_key(request, token), limit_per_minute=limit)
+        check_judge_rate_limit(
+            _rate_limit_key(request, token, clicker=clicker),
+            limit_per_minute=limit,
+        )
     except JudgeRateLimitExceeded as exc:
         raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=str(exc)) from exc
 
@@ -52,9 +66,7 @@ def _map_service_error(exc: judging_service.JudgingServiceError) -> HTTPExceptio
     return HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc))
 
 
-async def _resolve_assignment(
-    session: DbSession, token: str, *, require_readable: bool
-) -> object:
+async def _resolve_assignment(session: DbSession, token: str, *, require_readable: bool) -> object:
     assignment = await judging_service.resolve_assignment_by_token(session, token)
     if require_readable:
         judging_service._assert_entry_readable(assignment.entry)  # noqa: SLF001
@@ -81,6 +93,12 @@ def _build_access_read(assignment: object) -> JudgeAccessRead:
                 duration_ms=asset.duration_ms,
                 mime_type=asset.mime_type,
                 my_score=_score_to_read(score),
+                my_technical_clicks=[
+                    JudgeTechnicalClickRead.model_validate(click)
+                    for click in judging_service._clicks_for_video(  # noqa: SLF001
+                        assignment, entry_video.id
+                    )
+                ],
             )
         )
     return JudgeAccessRead(
@@ -150,12 +168,54 @@ async def upsert_judge_fe(
     try:
         assignment = await judging_service.resolve_assignment_by_token(session, token)
         judging_service._assert_entry_writable(assignment.entry)  # noqa: SLF001
-        score = await judging_service.upsert_judge_fe(
+        score = await judging_service.upsert_judge_fe(session, assignment, entry_video_id, payload)
+    except judging_service.JudgingServiceError as exc:
+        raise _map_service_error(exc) from exc
+    return JudgeFreestyleScoreRead.model_validate(score)
+
+
+@router.post(
+    "/{token}/videos/{entry_video_id}/technical-clicks",
+    response_model=JudgeTechnicalClickRead,
+    status_code=status.HTTP_201_CREATED,
+)
+async def add_judge_technical_click(
+    token: str,
+    entry_video_id: str,
+    payload: JudgeTechnicalClickCreate,
+    request: Request,
+    session: DbSession,
+    settings: SettingsDep,
+) -> JudgeTechnicalClickRead:
+    _check_rate_limit(request, token, settings, clicker=True)
+    try:
+        assignment = await judging_service.resolve_assignment_by_token(session, token)
+        click = await judging_service.add_technical_click(
             session, assignment, entry_video_id, payload
         )
     except judging_service.JudgingServiceError as exc:
         raise _map_service_error(exc) from exc
-    return JudgeFreestyleScoreRead.model_validate(score)
+    return JudgeTechnicalClickRead.model_validate(click)
+
+
+@router.delete(
+    "/{token}/videos/{entry_video_id}/technical-clicks/{click_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+async def delete_judge_technical_click(
+    token: str,
+    entry_video_id: str,
+    click_id: str,
+    request: Request,
+    session: DbSession,
+    settings: SettingsDep,
+) -> None:
+    _check_rate_limit(request, token, settings, clicker=True)
+    try:
+        assignment = await judging_service.resolve_assignment_by_token(session, token)
+        await judging_service.delete_technical_click(session, assignment, entry_video_id, click_id)
+    except judging_service.JudgingServiceError as exc:
+        raise _map_service_error(exc) from exc
 
 
 @router.post(
@@ -173,9 +233,7 @@ async def submit_judge_fe(
     _check_rate_limit(request, token, settings)
     try:
         assignment = await judging_service.resolve_assignment_by_token(session, token)
-        score = await judging_service.submit_judge_fe(
-            session, assignment, entry_video_id, payload
-        )
+        score = await judging_service.submit_judge_fe(session, assignment, entry_video_id, payload)
     except judging_service.JudgingServiceError as exc:
         raise _map_service_error(exc) from exc
     return JudgeFreestyleScoreRead.model_validate(score)

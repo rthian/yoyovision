@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
-from urllib.parse import urlparse
 
 import pytest
 from httpx import AsyncClient
@@ -218,6 +217,90 @@ async def test_locked_entry_allows_read_blocks_write(
     )
     assert write.status_code == 403
 
+
+async def test_technical_clicks_can_be_added_read_and_undone(
+    client: AsyncClient, admin_headers: dict[str, str]
+) -> None:
+    entry_id, entry_video_id, token = await _open_entry_with_judge(client, admin_headers)
+
+    positive = await client.post(
+        f"/judge-access/{token}/videos/{entry_video_id}/technical-clicks",
+        json={"timestamp_ms": 2_450, "kind": "positive"},
+    )
+    negative = await client.post(
+        f"/judge-access/{token}/videos/{entry_video_id}/technical-clicks",
+        json={"timestamp_ms": 3_100, "kind": "negative"},
+    )
+    assert positive.status_code == 201, positive.text
+    assert negative.status_code == 201, negative.text
+
+    access = await client.get(f"/judge-access/{token}")
+    clicks = access.json()["videos"][0]["my_technical_clicks"]
+    assert [(click["timestamp_ms"], click["kind"]) for click in clicks] == [
+        (2_450, "positive"),
+        (3_100, "negative"),
+    ]
+
+    entry = await client.get(f"/judging-entries/{entry_id}", headers=admin_headers)
+    assert entry.json()["judges"][0]["status"] == "in_progress"
+
+    deleted = await client.delete(
+        f"/judge-access/{token}/videos/{entry_video_id}/technical-clicks/{negative.json()['id']}"
+    )
+    assert deleted.status_code == 204, deleted.text
+    remaining = (await client.get(f"/judge-access/{token}")).json()["videos"][0][
+        "my_technical_clicks"
+    ]
+    assert [click["id"] for click in remaining] == [positive.json()["id"]]
+
+
+async def test_technical_clicks_are_locked_after_fe_submission(
+    client: AsyncClient, admin_headers: dict[str, str]
+) -> None:
+    _, entry_video_id, token = await _open_entry_with_judge(client, admin_headers)
+    click = await client.post(
+        f"/judge-access/{token}/videos/{entry_video_id}/technical-clicks",
+        json={"timestamp_ms": 1_000, "kind": "positive"},
+    )
+    assert click.status_code == 201
+    assert (
+        await client.post(
+            f"/judge-access/{token}/videos/{entry_video_id}/submit",
+            json=_FE_PAYLOAD,
+        )
+    ).status_code == 200
+
+    add_after_submit = await client.post(
+        f"/judge-access/{token}/videos/{entry_video_id}/technical-clicks",
+        json={"timestamp_ms": 2_000, "kind": "positive"},
+    )
+    undo_after_submit = await client.delete(
+        f"/judge-access/{token}/videos/{entry_video_id}/technical-clicks/{click.json()['id']}"
+    )
+    assert add_after_submit.status_code == 409
+    assert undo_after_submit.status_code == 409
+
+
+async def test_technical_click_rate_limit_does_not_block_access_or_submission(
+    client: AsyncClient, admin_headers: dict[str, str]
+) -> None:
+    from yoyovision_api.services import judge_rate_limit
+
+    judge_rate_limit.reset_judge_rate_limits()
+    _, entry_video_id, token = await _open_entry_with_judge(client, admin_headers)
+    for index in range(31):
+        response = await client.post(
+            f"/judge-access/{token}/videos/{entry_video_id}/technical-clicks",
+            json={"timestamp_ms": index * 10, "kind": "positive"},
+        )
+        assert response.status_code == 201, response.text
+
+    assert (await client.get(f"/judge-access/{token}")).status_code == 200
+    submitted = await client.post(
+        f"/judge-access/{token}/videos/{entry_video_id}/submit",
+        json=_FE_PAYLOAD,
+    )
+    assert submitted.status_code == 200, submitted.text
 
 
 async def test_revoked_token_returns_410_on_judge_access(

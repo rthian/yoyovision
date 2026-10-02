@@ -238,10 +238,14 @@ how a real adapter gets swapped in.
 
 Admins can create **judging entries** with multiple videos and invite
 name-only judges via private links (48h expiry, per-judge QR). Judges score
-at `/judge/{token}` without accounts; admins see panel aggregation and AI
-compare on `/admin/judging-entries/[id]`.
+at `/judge/{token}` without accounts using timestamped positive/negative
+technical clicks and an eight-category Freestyle Evaluation form. Admins see
+each judge's audit trail, panel aggregation, disagreement range, and AI compare
+on `/admin/judging-entries/[id]`. The same human evidence appears in Analysis
+Review for the scored video; it stays separate from the AI score.
 
 - Design: [`docs/multi_judge_entries.md`](docs/multi_judge_entries.md)
+- Competition-readiness gaps: [`docs/human_judging_roadmap.md`](docs/human_judging_roadmap.md)
 - Operator guide: [`docs/CreatorManual.md`](docs/CreatorManual.md#multi-judge-panel-judging)
 
 ## Local development

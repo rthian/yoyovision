@@ -38,3 +38,8 @@ class JudgeAssignmentStatus(StrEnum):
     PENDING = "pending"
     IN_PROGRESS = "in_progress"
     SUBMITTED = "submitted"
+
+
+class TechnicalClickKind(StrEnum):
+    POSITIVE = "positive"
+    NEGATIVE = "negative"

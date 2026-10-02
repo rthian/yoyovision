@@ -2,12 +2,10 @@
 
 from __future__ import annotations
 
-from urllib.parse import urlparse
-
 import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
-from yoyovision_ml.domain import JobStatus, Source, VideoStatus
+from yoyovision_ml.domain import JobStatus, Source
 from yoyovision_ml.media_validation import VideoMetadata
 
 from yoyovision_api import security
@@ -16,7 +14,6 @@ from yoyovision_api.db_models import (
     FreestyleEvaluationORM,
     JudgeFreestyleScoreORM,
     User,
-    VideoAssetORM,
 )
 
 _MP4_HEADER = b"\x00\x00\x00\x18ftypmp42" + b"\x00" * 8
@@ -57,9 +54,7 @@ def _token_from_url(invite_url: str) -> str:
     return invite_url.rstrip("/").rsplit("/", 1)[-1]
 
 
-async def _create_open_entry(
-    client: AsyncClient, admin_headers: dict[str, str]
-) -> tuple[str, str]:
+async def _create_open_entry(client: AsyncClient, admin_headers: dict[str, str]) -> tuple[str, str]:
     video_id = await _upload_video(client, admin_headers)
     entry = (
         await client.post(
@@ -161,6 +156,76 @@ async def test_simple_mean_panel_aggregate(
     assert len(video["judges"]) == 2
 
 
+async def test_results_include_timestamped_technical_clicks(
+    client: AsyncClient, admin_headers: dict[str, str]
+) -> None:
+    entry_id, entry_video_id = await _create_open_entry(client, admin_headers)
+    token_a = await _add_judge_token(client, admin_headers, entry_id, "Alex")
+    token_b = await _add_judge_token(client, admin_headers, entry_id, "Blake")
+    for token, clicks in (
+        (token_a, [(1_000, "positive"), (1_500, "positive"), (2_000, "negative")]),
+        (token_b, [(1_100, "positive"), (1_600, "positive")]),
+    ):
+        for timestamp_ms, kind in clicks:
+            response = await client.post(
+                f"/judge-access/{token}/videos/{entry_video_id}/technical-clicks",
+                json={"timestamp_ms": timestamp_ms, "kind": kind},
+            )
+            assert response.status_code == 201, response.text
+        await _submit_fe(client, token, entry_video_id)
+
+    response = await client.get(f"/judging-entries/{entry_id}/results", headers=admin_headers)
+    assert response.status_code == 200, response.text
+    video = response.json()["videos"][0]
+    assert video["panel_net_technical_clicks"] == 1.5
+    assert video["technical_click_range"] == 1
+    alex = next(row for row in video["judges"] if row["display_name"] == "Alex")
+    assert alex["positive_clicks"] == 2
+    assert alex["negative_clicks"] == 1
+    assert alex["net_technical_clicks"] == 1
+    assert [click["timestamp_ms"] for click in alex["technical_clicks"]] == [
+        1_000,
+        1_500,
+        2_000,
+    ]
+
+
+async def test_analysis_human_reference_matches_judging_entry_by_video(
+    client: AsyncClient,
+    admin_headers: dict[str, str],
+    db_session: AsyncSession,
+) -> None:
+    entry_id, entry_video_id = await _create_open_entry(client, admin_headers)
+    detail = await client.get(f"/judging-entries/{entry_id}", headers=admin_headers)
+    video_id = detail.json()["videos"][0]["video_id"]
+    token = await _add_judge_token(client, admin_headers, entry_id, "Alex")
+    click = await client.post(
+        f"/judge-access/{token}/videos/{entry_video_id}/technical-clicks",
+        json={"timestamp_ms": 4_200, "kind": "positive"},
+    )
+    assert click.status_code == 201
+    await _submit_fe(client, token, entry_video_id)
+
+    job = AnalysisJobORM(
+        video_id=video_id,
+        status=JobStatus.COMPLETED,
+        progress=1.0,
+        pipeline_version="0.1.0-dev",
+    )
+    db_session.add(job)
+    await db_session.commit()
+
+    reference = await client.get(
+        f"/analyses/{job.id}/human-judging-reference", headers=admin_headers
+    )
+    assert reference.status_code == 200, reference.text
+    payload = reference.json()
+    assert payload["video_id"] == video_id
+    assert payload["entries"][0]["entry_id"] == entry_id
+    assert payload["entries"][0]["panel_net_technical_clicks"] == 1.0
+    assert payload["entries"][0]["judges"][0]["technical_clicks"][0]["timestamp_ms"] == 4_200
+
+
 async def test_shadow_judge_excluded_from_aggregate(
     client: AsyncClient, admin_headers: dict[str, str]
 ) -> None:
@@ -246,9 +311,9 @@ async def test_profile_c_includes_ai_virtual_judge(
     admin_user: User,
 ) -> None:
     entry_id, entry_video_id = await _create_open_entry(client, admin_headers)
-    video_id = (
-        await client.get(f"/judging-entries/{entry_id}", headers=admin_headers)
-    ).json()["videos"][0]["video_id"]
+    video_id = (await client.get(f"/judging-entries/{entry_id}", headers=admin_headers)).json()[
+        "videos"
+    ][0]["video_id"]
     analysis_id = await _link_analysis_with_fe(db_session, admin_user, video_id, execution=9.0)
     await client.patch(
         f"/judging-entries/{entry_id}/videos/{entry_video_id}/analyses",
