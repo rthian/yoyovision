@@ -110,7 +110,17 @@ export function EventTable({
                   ? "bg-status-positive/5"
                   : "";
               return (
-              <tr key={event.id} className={`border-t border-outline-softest ${rowClass}`}>
+              <tr
+                key={event.id}
+                onClick={(clickEvent) => {
+                  const target = clickEvent.target as HTMLElement;
+                  if (!target.closest("button, input, select, a")) {
+                    onSeek(event.start_ms);
+                  }
+                }}
+                title={`Go to ${formatMsAsTimecode(event.start_ms)}`}
+                className={`cursor-pointer border-t border-outline-softest transition-colors hover:bg-status-informative/5 ${rowClass}`}
+              >
                 <td className="px-3 py-2">
                   <button
                     type="button"
