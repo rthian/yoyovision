@@ -387,6 +387,14 @@ Analysis Review automatically finds judging entries for the same video. Its
 judge's click trail, and aggregated FE. Click a timestamp to seek the analysis
 video. Human evidence is never silently blended into the deterministic AI score.
 
+The **Trick events** panel can switch from **AI scoring** to **Human comparison**.
+Human comparison assigns each counting judge click to the nearest detected trick
+when the click is inside its time range or within 1.5 seconds. Use **Human
+clicked** to inspect only tricks with judge evidence and **Disagreements** to find
+AI outcomes whose direction conflicts with the human net clicks. The full event
+table shows every matched raw click; unmatched clicks remain counted and are
+reported separately rather than forced onto a trick.
+
 ### Configuration
 
 | Variable | Purpose |

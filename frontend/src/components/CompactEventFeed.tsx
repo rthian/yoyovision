@@ -1,4 +1,5 @@
 import { formatConfidence, formatMsAsTimecode, titleCaseFromSnakeCase } from "@/lib/format";
+import type { HumanEventEvidence } from "@/lib/human-click-matching";
 import { lineItemReasonLabel } from "@/lib/scoring-labels";
 import type { AnalysisEvent, TechnicalLineItem } from "@/lib/types";
 
@@ -8,6 +9,8 @@ interface CompactEventFeedProps {
   currentMs: number;
   activeEventId: string | null;
   onSeek: (ms: number) => void;
+  view?: "ai" | "human";
+  humanEvidenceByEventId?: Map<string, HumanEventEvidence>;
   maxRows?: number;
 }
 
@@ -18,6 +21,8 @@ export function CompactEventFeed({
   currentMs,
   activeEventId,
   onSeek,
+  view = "ai",
+  humanEvidenceByEventId = new Map(),
   maxRows = 8,
 }: CompactEventFeedProps): JSX.Element {
   const sortedEvents = [...events].sort((a, b) => a.start_ms - b.start_ms);
@@ -34,13 +39,14 @@ export function CompactEventFeed({
       <div className="grid grid-cols-[5.5rem_minmax(0,1fr)_5.5rem] gap-2 bg-surface-alt px-3 py-2 text-xs font-semibold uppercase tracking-wide text-content-dim">
         <span>Time</span>
         <span>Trick</span>
-        <span className="text-right">Result</span>
+        <span className="text-right">{view === "human" ? "Human" : "Result"}</span>
       </div>
       <div aria-live="polite">
         {visibleEvents.map((event) => {
           const isActive = event.id === activeEventId;
           const isCompleted = event.end_ms <= currentMs;
           const lineItem = lineItemsByEventId.get(event.id);
+          const humanEvidence = humanEvidenceByEventId.get(event.id);
           const rowClass = isActive
             ? "border-brand-primary-default bg-brand-primary-softest"
             : isCompleted
@@ -62,14 +68,41 @@ export function CompactEventFeed({
                   {event.label}
                 </span>
                 <span className="block text-xs text-content-dim">
-                  {formatConfidence(event.confidence)} confidence
+                  {view === "human"
+                    ? `AI: ${titleCaseFromSnakeCase(event.outcome)} · ${formatConfidence(event.confidence)}`
+                    : `${formatConfidence(event.confidence)} confidence`}
                 </span>
               </span>
               <span className="flex flex-col items-end text-right">
-                <span className="text-content-subtle">
-                  {titleCaseFromSnakeCase(event.outcome)}
-                </span>
-                {lineItem && isCompleted ? (
+                {view === "human" ? (
+                  humanEvidence ? (
+                    <>
+                      <span
+                        className={`font-semibold ${
+                          humanEvidence.net > 0
+                            ? "text-status-positive"
+                            : humanEvidence.net < 0
+                              ? "text-status-alert"
+                              : "text-content-subtle"
+                        }`}
+                        title={`${humanEvidence.judgeCount} judge${humanEvidence.judgeCount === 1 ? "" : "s"}`}
+                      >
+                        {humanEvidence.net > 0 ? "+" : ""}
+                        {humanEvidence.net} net
+                      </span>
+                      <span className="text-xs text-content-dim">
+                        +{humanEvidence.positive} / −{humanEvidence.negative}
+                      </span>
+                    </>
+                  ) : (
+                    <span className="text-xs text-content-dim">No click</span>
+                  )
+                ) : (
+                  <>
+                    <span className="text-content-subtle">
+                      {titleCaseFromSnakeCase(event.outcome)}
+                    </span>
+                    {lineItem && isCompleted ? (
                   <span
                     className={
                       lineItem.points > 0
@@ -81,8 +114,10 @@ export function CompactEventFeed({
                     <span className="text-content-dim"> pts</span>
                     <span className="sr-only"> {lineItemReasonLabel(lineItem.reason)}</span>
                   </span>
-                ) : (
-                  <span className="text-xs text-content-dim">Pending</span>
+                    ) : (
+                      <span className="text-xs text-content-dim">Pending</span>
+                    )}
+                  </>
                 )}
               </span>
             </button>

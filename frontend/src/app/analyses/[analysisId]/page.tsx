@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 import { useParams } from "next/navigation";
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 
 import { AuthGate } from "@/components/AuthGate";
 import { AnalysisTrainingContext } from "@/components/AnalysisTrainingContext";
@@ -34,8 +35,16 @@ import { useRuleset, useRulesets } from "@/hooks/useRulesets";
 import { useTrainingAnnotations } from "@/hooks/useTrainingAnnotations";
 import { useVideo } from "@/hooks/useVideos";
 import { useVideoBlobUrl } from "@/hooks/useVideoBlobUrl";
+import { getAnalysisHumanJudgingReference } from "@/lib/api-client";
+import {
+  buildHumanClickComparison,
+  HUMAN_CLICK_MATCH_TOLERANCE_MS,
+  humanEvidenceDisagrees,
+} from "@/lib/human-click-matching";
 
 type ReviewFilter = "all" | "pending" | "low-confidence" | "uncertain" | "edited";
+type TrickView = "ai" | "human";
+type HumanTrickFilter = "all" | "clicked" | "disagreement";
 
 const REVIEW_FILTER_LABELS: Record<ReviewFilter, string> = {
   all: "All",
@@ -51,6 +60,8 @@ function AnalysisReview({ analysisId }: { analysisId: string }): JSX.Element {
   const [seekToMs, setSeekToMs] = useState<number | null>(null);
   const [showFullEventTable, setShowFullEventTable] = useState(false);
   const [reviewFilter, setReviewFilter] = useState<ReviewFilter>("all");
+  const [trickView, setTrickView] = useState<TrickView>("ai");
+  const [humanTrickFilter, setHumanTrickFilter] = useState<HumanTrickFilter>("all");
 
   const jobQuery = useAnalysisJob(analysisId, isAuthenticated);
   const job = jobQuery.data;
@@ -77,6 +88,11 @@ function AnalysisReview({ analysisId }: { analysisId: string }): JSX.Element {
   const rulesetQuery = useRuleset(rulesetVersion, isAuthenticated);
   const rulesetsQuery = useRulesets(isAuthenticated);
   const updateRuleset = useUpdateAnalysisRuleset(analysisId);
+  const humanReferenceQuery = useQuery({
+    queryKey: ["analyses", analysisId, "human-judging-reference"],
+    queryFn: () => getAnalysisHumanJudgingReference(analysisId),
+    enabled: isAuthenticated,
+  });
 
   const allEvents = eventsQuery.data ?? [];
   const videoDurationMs = videoQuery.data?.duration_ms ?? 0;
@@ -95,13 +111,34 @@ function AnalysisReview({ analysisId }: { analysisId: string }): JSX.Element {
     uncertain: events.filter((event) => event.outcome === "uncertain").length,
     edited: events.filter((event) => event.review_status === "edited").length,
   };
-  const filteredEvents = events.filter((event) => {
+  const reviewFilteredEvents = events.filter((event) => {
     if (reviewFilter === "pending") return event.review_status === "pending";
     if (reviewFilter === "low-confidence") return event.confidence < 0.7;
     if (reviewFilter === "uncertain") return event.outcome === "uncertain";
     if (reviewFilter === "edited") return event.review_status === "edited";
     return true;
   });
+  const humanComparison = buildHumanClickComparison(
+    events,
+    humanReferenceQuery.data?.entries ?? []
+  );
+  const humanClickedEventCount = events.filter((event) =>
+    humanComparison.byEventId.has(event.id)
+  ).length;
+  const humanDisagreementCount = events.filter((event) =>
+    humanEvidenceDisagrees(event, humanComparison.byEventId.get(event.id))
+  ).length;
+  const applyHumanFilter = (sourceEvents: typeof events): typeof events => {
+    if (trickView !== "human" || humanTrickFilter === "all") return sourceEvents;
+    if (humanTrickFilter === "clicked") {
+      return sourceEvents.filter((event) => humanComparison.byEventId.has(event.id));
+    }
+    return sourceEvents.filter((event) =>
+      humanEvidenceDisagrees(event, humanComparison.byEventId.get(event.id))
+    );
+  };
+  const trickEvents = applyHumanFilter(events);
+  const fullTableEvents = applyHumanFilter(reviewFilteredEvents);
   const nextEventNeedingReview = events.find(
     (event) =>
       event.review_status === "pending" || event.confidence < 0.7 || event.outcome === "uncertain"
@@ -342,7 +379,7 @@ function AnalysisReview({ analysisId }: { analysisId: string }): JSX.Element {
             <div>
               <h2 className="text-lg font-semibold text-content-default">Trick events</h2>
               <p className="text-sm text-content-dim">
-                In routine · {Math.min(8, events.length)} of {events.length}
+                In routine · {Math.min(8, trickEvents.length)} of {trickEvents.length}
               </p>
             </div>
             <button
@@ -354,12 +391,72 @@ function AnalysisReview({ analysisId }: { analysisId: string }): JSX.Element {
               {showFullEventTable ? "Hide full table" : "View full table"}
             </button>
           </div>
+          <div className="flex rounded-full border border-outline-soft bg-surface-default p-1 text-xs font-semibold">
+            <button
+              type="button"
+              aria-pressed={trickView === "ai"}
+              onClick={() => setTrickView("ai")}
+              className={`flex-1 rounded-full px-3 py-1.5 ${
+                trickView === "ai"
+                  ? "bg-brand-primary text-white"
+                  : "text-content-subtle hover:bg-surface-alt"
+              }`}
+            >
+              AI scoring
+            </button>
+            <button
+              type="button"
+              aria-pressed={trickView === "human"}
+              onClick={() => setTrickView("human")}
+              className={`flex-1 rounded-full px-3 py-1.5 ${
+                trickView === "human"
+                  ? "bg-brand-primary text-white"
+                  : "text-content-subtle hover:bg-surface-alt"
+              }`}
+            >
+              Human comparison
+            </button>
+          </div>
+          {trickView === "human" ? (
+            <div className="rounded-s border border-outline-soft bg-surface-alt p-3">
+              <div className="flex flex-wrap gap-2" aria-label="Filter tricks by human evidence">
+                {(
+                  [
+                    ["all", "All tricks", events.length],
+                    ["clicked", "Human clicked", humanClickedEventCount],
+                    ["disagreement", "Disagreements", humanDisagreementCount],
+                  ] as const
+                ).map(([filter, label, count]) => (
+                  <button
+                    key={filter}
+                    type="button"
+                    aria-pressed={humanTrickFilter === filter}
+                    onClick={() => setHumanTrickFilter(filter)}
+                    className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${
+                      humanTrickFilter === filter
+                        ? "border-brand-primary bg-brand-primary-softest text-brand-boldest"
+                        : "border-outline-default bg-surface-default text-content-subtle"
+                    }`}
+                  >
+                    {label} · {count}
+                  </button>
+                ))}
+              </div>
+              <p className="mt-2 text-xs text-content-dim">
+                {humanComparison.totalClicks} counting-judge clicks · matched within ±
+                {(HUMAN_CLICK_MATCH_TOLERANCE_MS / 1000).toFixed(1)}s ·{" "}
+                {humanComparison.unmatchedClicks.length} unmatched
+              </p>
+            </div>
+          ) : null}
           <CompactEventFeed
-            events={events}
+            events={trickEvents}
             lineItemsByEventId={lineItemsByEventId}
             currentMs={currentMs}
             activeEventId={livePreview?.active_event_id ?? null}
             onSeek={handleSeek}
+            view={trickView}
+            humanEvidenceByEventId={humanComparison.byEventId}
           />
         </section>
       </div>
@@ -386,19 +483,25 @@ function AnalysisReview({ analysisId }: { analysisId: string }): JSX.Element {
           <div>
             <h2 className="text-lg font-semibold text-content-default">Full event review</h2>
             <p className="text-sm text-content-dim">
-              {filteredEvents.length === events.length
+              {fullTableEvents.length === events.length
                 ? `${events.length} detected events with full editing and review controls`
-                : `${filteredEvents.length} of ${events.length} events · ${REVIEW_FILTER_LABELS[reviewFilter]}`}
+                : `${fullTableEvents.length} of ${events.length} events · ${REVIEW_FILTER_LABELS[reviewFilter]}${
+                    trickView === "human" && humanTrickFilter !== "all"
+                      ? ` · ${humanTrickFilter === "clicked" ? "Human clicked" : "Disagreements"}`
+                      : ""
+                  }`}
             </p>
           </div>
           <EventTable
             analysisId={analysisId}
-            events={filteredEvents}
+            events={fullTableEvents}
             lineItemsByEventId={lineItemsByEventId}
             currentMs={currentMs}
             activeEventId={livePreview?.active_event_id ?? null}
             onSeek={handleSeek}
             readOnly={isLocked}
+            showHumanEvidence={trickView === "human"}
+            humanEvidenceByEventId={humanComparison.byEventId}
           />
         </section>
       ) : null}
