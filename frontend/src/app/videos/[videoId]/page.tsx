@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useState } from "react";
 
@@ -7,6 +8,7 @@ import { AnalysisJobList } from "@/components/AnalysisJobList";
 import { ShadowAdapterPanel } from "@/components/ShadowAdapterPanel";
 import { ShadowComparisonPanel } from "@/components/ShadowComparisonPanel";
 import { AuthGate } from "@/components/AuthGate";
+import { TrainingAnnotationPanel } from "@/components/TrainingAnnotationPanel";
 
 import { useAuth } from "@/hooks/useAuth";
 import {
@@ -51,12 +53,33 @@ function VideoDetail({ videoId }: { videoId: string }): JSX.Element {
       <div>
         <h1 className="text-2xl font-bold text-content-default">{video.original_filename}</h1>
         <p className="mt-1 text-sm text-content-dim">
-          {video.division} · {video.status} - {formatBytes(video.file_size)} - uploaded{" "}
+          {video.division} · performer {video.player_id ?? "not set"} · {video.status} -{" "}
+          {formatBytes(video.file_size)} - uploaded{" "}
           {formatDateTime(video.created_at)}
           {video.width && video.height ? ` - ${video.width}x${video.height}` : ""}
           {video.fps ? ` @ ${video.fps.toFixed(1)}fps` : ""}
         </p>
+        {video.source_url ? (
+          <a
+            href={video.source_url}
+            target="_blank"
+            rel="noreferrer"
+            className="text-sm text-brand-boldest underline"
+          >
+            View source video
+          </a>
+        ) : null}
+        <div className="mt-3">
+          <Link
+            href={`/tricks?videoId=${video.id}&division=${video.division}`}
+            className="inline-flex rounded-full border border-outline-default px-4 py-2 text-sm font-semibold text-content-subtle hover:bg-surface-alt"
+          >
+            Add video segment to Trick Library
+          </Link>
+        </div>
       </div>
+
+      <TrainingAnnotationPanel videoId={videoId} durationMs={video.duration_ms ?? 0} />
 
       {video.division !== "1A" ? (
         <p className="rounded-s border border-outline-soft bg-surface-alt p-3 text-sm text-content-dim">

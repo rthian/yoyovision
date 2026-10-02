@@ -42,8 +42,12 @@ function EntryDetail({ entryId }: { entryId: string }): JSX.Element {
     onSuccess: (invite) => setShareInvite(invite),
   });
 
-  const profileMutation = useMutation({
-    mutationFn: (payload: { ai_mix_profile?: string; aggregation_mode?: string }) =>
+  const entryMutation = useMutation({
+    mutationFn: (payload: {
+      ai_mix_profile?: string;
+      aggregation_mode?: string;
+      status?: "open" | "locked";
+    }) =>
       updateJudgingEntry(entryId, payload),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["judgingEntry", entryId] });
@@ -70,17 +74,37 @@ function EntryDetail({ entryId }: { entryId: string }): JSX.Element {
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-8">
       <header>
-        <h1 className="text-2xl font-bold text-content-default">{entry.title}</h1>
-        <p className="text-sm text-content-dim">
-          {entry.division} · {entry.mode} · {entry.status} · {entry.videos.length} videos
-        </p>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h1 className="text-2xl font-bold text-content-default">{entry.title}</h1>
+            <p className="text-sm text-content-dim">
+              {entry.division} · {entry.mode} · {entry.status} · {entry.videos.length} videos
+            </p>
+          </div>
+          <button
+            type="button"
+            disabled={entryMutation.isPending}
+            onClick={() => {
+              const nextStatus = entry.status === "locked" ? "open" : "locked";
+              if (
+                nextStatus === "open" ||
+                window.confirm("Lock this entry? Judges will keep read access but cannot change scores.")
+              ) {
+                entryMutation.mutate({ status: nextStatus });
+              }
+            }}
+            className="rounded-full border border-outline-default px-4 py-2 text-sm font-semibold hover:bg-surface-alt disabled:opacity-50"
+          >
+            {entry.status === "locked" ? "Reopen judging" : "Lock judging"}
+          </button>
+        </div>
         <div className="mt-3 flex flex-wrap gap-3">
           <label className="flex flex-col gap-1 text-xs text-content-dim">
             AI profile
             <select
               value={entry.ai_mix_profile}
-              disabled={profileMutation.isPending}
-              onChange={(e) => profileMutation.mutate({ ai_mix_profile: e.target.value })}
+              disabled={entryMutation.isPending || entry.status === "locked"}
+              onChange={(e) => entryMutation.mutate({ ai_mix_profile: e.target.value })}
               className="h-9 rounded-s border border-outline-default px-2 text-sm"
             >
               <option value="A">A — Compare only</option>
@@ -92,8 +116,8 @@ function EntryDetail({ entryId }: { entryId: string }): JSX.Element {
             Aggregation
             <select
               value={entry.aggregation_mode}
-              disabled={profileMutation.isPending}
-              onChange={(e) => profileMutation.mutate({ aggregation_mode: e.target.value })}
+              disabled={entryMutation.isPending || entry.status === "locked"}
+              onChange={(e) => entryMutation.mutate({ aggregation_mode: e.target.value })}
               className="h-9 rounded-s border border-outline-default px-2 text-sm"
             >
               <option value="auto">Auto</option>
@@ -136,7 +160,7 @@ function EntryDetail({ entryId }: { entryId: string }): JSX.Element {
           </label>
           <button
             type="submit"
-            disabled={!judgeName || addJudgeMutation.isPending}
+            disabled={!judgeName || addJudgeMutation.isPending || entry.status === "locked"}
             className="rounded-full bg-brand-default px-4 py-2 text-sm font-semibold text-content-on-brand disabled:opacity-50"
           >
             Add judge
@@ -161,7 +185,7 @@ function EntryDetail({ entryId }: { entryId: string }): JSX.Element {
                 <div className="flex flex-wrap gap-2">
                   <button
                     type="button"
-                    disabled={revoked || rotateMutation.isPending}
+                    disabled={revoked || rotateMutation.isPending || entry.status === "locked"}
                     onClick={() => {
                       const ok = window.confirm(
                         "Re-issue invite? The previous link stops working immediately."
@@ -176,7 +200,7 @@ function EntryDetail({ entryId }: { entryId: string }): JSX.Element {
                   </button>
                   <button
                     type="button"
-                    disabled={revoked || revokeMutation.isPending}
+                    disabled={revoked || revokeMutation.isPending || entry.status === "locked"}
                     onClick={() => revokeMutation.mutate(judge.id)}
                     className="rounded-full bg-status-alert-soft px-3 py-1.5 text-xs font-semibold text-status-alert-boldest"
                   >

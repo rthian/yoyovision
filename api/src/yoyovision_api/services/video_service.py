@@ -10,10 +10,11 @@ client-declared content type alone.
 from __future__ import annotations
 
 import tempfile
+from datetime import UTC, datetime
 from pathlib import Path
 
 from sqlalchemy.ext.asyncio import AsyncSession
-from yoyovision_ml.domain import Division, VideoStatus
+from yoyovision_ml.domain import Division, VideoSource, VideoStatus
 from yoyovision_ml.interfaces import StoragePort
 
 from yoyovision_api.config import Settings
@@ -38,6 +39,11 @@ async def create_video_from_upload(
     original_filename: str,
     declared_mime_type: str,
     file_bytes: bytes,
+    source_type: VideoSource = VideoSource.UPLOAD,
+    source_url: str | None = None,
+    source_external_id: str | None = None,
+    player_id: str | None = None,
+    rights_confirmed: bool = False,
 ) -> VideoAssetORM:
     """Validates and persists an uploaded video. Raises `MediaValidationError`
     (mapped to HTTP 422 by the router) if any security/quality check fails.
@@ -66,6 +72,11 @@ async def create_video_from_upload(
     video = VideoAssetORM(
         owner_id=owner.id,
         division=division,
+        source_type=source_type,
+        source_url=source_url,
+        source_external_id=source_external_id,
+        player_id=player_id,
+        rights_confirmed_at=datetime.now(UTC) if rights_confirmed else None,
         original_filename=_truncate_filename(original_filename),
         storage_key=storage_key,
         mime_type=declared_mime_type,

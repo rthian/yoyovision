@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 from yoyovision_ml.domain import (
     AnalysisReviewState,
     DeductionType,
@@ -16,6 +17,8 @@ from yoyovision_ml.domain import (
     PipelineStage,
     ReviewStatus,
     Source,
+    TechnicalCredit,
+    VideoSource,
     VideoStatus,
 )
 from yoyovision_ml.pipeline_config import PipelineAdapterConfig
@@ -26,6 +29,7 @@ from yoyovision_api.judging_enums import (
     JudgeAssignmentStatus,
     JudgingEntryMode,
     JudgingEntryStatus,
+    TechnicalClickKind,
 )
 
 
@@ -35,6 +39,11 @@ class VideoAssetRead(BaseModel):
     id: str
     owner_id: str
     division: Division
+    source_type: VideoSource
+    source_url: str | None
+    source_external_id: str | None
+    player_id: str | None
+    rights_confirmed_at: datetime | None
     original_filename: str
     mime_type: str
     duration_ms: int | None
@@ -45,6 +54,168 @@ class VideoAssetRead(BaseModel):
     status: VideoStatus
     created_at: datetime
     deleted_at: datetime | None
+
+
+class YoutubeImportCreate(BaseModel):
+    url: str = Field(min_length=1, max_length=2048)
+    division: Division = Division.ONE_A
+    player_id: str = Field(min_length=1, max_length=128)
+    rights_confirmed: Literal[True]
+
+    @field_validator("player_id")
+    @classmethod
+    def _player_id_must_not_be_blank(cls, value: str) -> str:
+        stripped = value.strip()
+        if not stripped:
+            raise ValueError("player_id must not be blank")
+        return stripped
+
+
+class TrainingAnnotationCreate(BaseModel):
+    label: str = Field(min_length=1, max_length=128)
+    element_type: str = Field(min_length=1, max_length=64)
+    start_ms: int = Field(ge=0)
+    end_ms: int = Field(gt=0)
+    outcome: Outcome
+    technical_credit: TechnicalCredit = TechnicalCredit.UNCERTAIN
+    notes: str = Field(default="", max_length=2048)
+
+    @model_validator(mode="after")
+    def _end_after_start(self) -> TrainingAnnotationCreate:
+        if self.end_ms <= self.start_ms:
+            raise ValueError("end_ms must be greater than start_ms")
+        return self
+
+
+class TrainingAnnotationUpdate(BaseModel):
+    label: str | None = Field(default=None, min_length=1, max_length=128)
+    element_type: str | None = Field(default=None, min_length=1, max_length=64)
+    start_ms: int | None = Field(default=None, ge=0)
+    end_ms: int | None = Field(default=None, gt=0)
+    outcome: Outcome | None = None
+    technical_credit: TechnicalCredit | None = None
+    notes: str | None = Field(default=None, max_length=2048)
+
+
+class TrainingAnnotationRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    video_id: str
+    created_by: str
+    division: Division
+    label: str
+    element_type: str
+    start_ms: int
+    end_ms: int
+    outcome: Outcome
+    technical_credit: TechnicalCredit
+    notes: str
+    created_at: datetime
+    updated_at: datetime
+
+
+TrickViewType = Literal[
+    "tutorial",
+    "slow_motion",
+    "full_speed",
+    "alternate_angle",
+    "stage",
+    "other",
+]
+
+
+class TrickCatalogCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=128)
+    division: Division
+    aliases: list[str] = Field(default_factory=list, max_length=20)
+    description: str = Field(default="", max_length=2048)
+
+    @field_validator("name")
+    @classmethod
+    def _clean_name(cls, value: str) -> str:
+        clean = value.strip()
+        if not clean:
+            raise ValueError("Trick name is required.")
+        return clean
+
+    @field_validator("aliases")
+    @classmethod
+    def _clean_aliases(cls, values: list[str]) -> list[str]:
+        return list(dict.fromkeys(value.strip() for value in values if value.strip()))
+
+
+class TrickCatalogUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=128)
+    aliases: list[str] | None = Field(default=None, max_length=20)
+    description: str | None = Field(default=None, max_length=2048)
+
+    @field_validator("name")
+    @classmethod
+    def _clean_optional_name(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        clean = value.strip()
+        if not clean:
+            raise ValueError("Trick name is required.")
+        return clean
+
+
+class TrickExampleCreate(BaseModel):
+    video_id: str
+    start_ms: int = Field(ge=0)
+    end_ms: int = Field(gt=0)
+    view_type: TrickViewType
+    camera_angle: str = Field(default="", max_length=64)
+    playback_speed: float = Field(default=1.0, gt=0, le=4.0)
+    notes: str = Field(default="", max_length=2048)
+    is_primary: bool = False
+
+    @model_validator(mode="after")
+    def _end_after_start(self) -> TrickExampleCreate:
+        if self.end_ms <= self.start_ms:
+            raise ValueError("end_ms must be greater than start_ms")
+        return self
+
+
+class TrickExampleUpdate(BaseModel):
+    start_ms: int | None = Field(default=None, ge=0)
+    end_ms: int | None = Field(default=None, gt=0)
+    view_type: TrickViewType | None = None
+    camera_angle: str | None = Field(default=None, max_length=64)
+    playback_speed: float | None = Field(default=None, gt=0, le=4.0)
+    notes: str | None = Field(default=None, max_length=2048)
+    is_primary: bool | None = None
+
+
+class TrickExampleRead(BaseModel):
+    id: str
+    trick_id: str
+    video_id: str
+    start_ms: int
+    end_ms: int
+    view_type: TrickViewType
+    camera_angle: str
+    playback_speed: float
+    notes: str
+    is_primary: bool
+    original_filename: str
+    source_type: VideoSource
+    source_url: str | None
+    created_at: datetime
+    updated_at: datetime
+
+
+class TrickCatalogRead(BaseModel):
+    id: str
+    owner_id: str
+    division: Division
+    name: str
+    aliases: list[str]
+    description: str
+    examples: list[TrickExampleRead]
+    created_at: datetime
+    updated_at: datetime
 
 
 class AnalysisJobRead(BaseModel):
@@ -393,6 +564,20 @@ class JudgeFreestyleScoreUpsert(BaseModel):
     notes: str = Field(default="", max_length=4096)
 
 
+class JudgeTechnicalClickCreate(BaseModel):
+    timestamp_ms: int = Field(ge=0)
+    kind: TechnicalClickKind
+
+
+class JudgeTechnicalClickRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    timestamp_ms: int
+    kind: TechnicalClickKind
+    created_at: datetime
+
+
 class JudgeAccessVideoRead(BaseModel):
     entry_video_id: str
     sort_order: int
@@ -400,6 +585,7 @@ class JudgeAccessVideoRead(BaseModel):
     duration_ms: int | None
     mime_type: str | None
     my_score: JudgeFreestyleScoreRead | None
+    my_technical_clicks: list[JudgeTechnicalClickRead]
 
 
 class JudgeAccessRead(BaseModel):
@@ -438,6 +624,10 @@ class JudgeResultRow(BaseModel):
     included_in_aggregate: bool
     scores: FeCategoryScores
     notes: str
+    positive_clicks: int
+    negative_clicks: int
+    net_technical_clicks: int
+    technical_clicks: list[JudgeTechnicalClickRead]
 
 
 class VideoResults(BaseModel):
@@ -456,6 +646,8 @@ class VideoResults(BaseModel):
     ai_virtual_judge_included: bool
     effective_aggregation_mode: str
     warnings: list[str]
+    panel_net_technical_clicks: float | None
+    technical_click_range: int | None
 
 
 class JudgingEntryResultsRead(BaseModel):
@@ -468,3 +660,20 @@ class JudgingEntryResultsRead(BaseModel):
     aggregation_mode: AggregationMode
     videos: list[VideoResults]
     warnings: list[str]
+
+
+class HumanJudgingEntryReference(BaseModel):
+    entry_id: str
+    title: str
+    mode: JudgingEntryMode
+    status: JudgingEntryStatus
+    judges: list[JudgeResultRow]
+    panel_net_technical_clicks: float | None
+    technical_click_range: int | None
+    panel_freestyle: FeCategoryScores
+
+
+class AnalysisHumanJudgingReferenceRead(BaseModel):
+    analysis_id: str
+    video_id: str
+    entries: list[HumanJudgingEntryReference]

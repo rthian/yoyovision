@@ -110,11 +110,17 @@ Token grants access to **all videos** on that entry for that judge only.
 
 Maps to existing ML type `JudgeFreestyleScore` / domain `FreestyleEvaluation`.
 
-### 5.5 v2 (documented, not built)
+### 5.5 JudgeTechnicalClick
 
-- `JudgeClick` rows: `assignment_id`, `entry_video_id`, `timestamp_ms`, optional `label`.
-- Entry flag `click_mode`: `training_only` \| `technical_score`.
-- Click → TE path only when `technical_score`.
+Timestamped technical scoring is implemented as positive or negative judge
+actions with `assignment_id`, `entry_video_id`, `timestamp_ms`, `kind`, and an
+immutable creation time. A judge can undo an action until submitting FE for the
+video. The head judge receives raw trails plus positive, negative, net, panel
+average, and net-score range values.
+
+Clicks are reference evidence. They are not converted into detected trick
+events and do not alter an Analysis score. Consensus clustering and an explicit
+training-versus-official click mode remain future work.
 
 ## 6. AI mix profiles (per entry)
 
@@ -179,7 +185,7 @@ Warnings when category range ≥ 3.0 points (existing `_DISAGREEMENT_THRESHOLD` 
 
 1. Open private link (mobile-first).
 2. See entry title + video list only (no other judges).
-3. Per video: player + FE form; Save draft / Submit (confirm).
+3. Per video: video player, technical clicker, and FE form; Save draft / Submit.
 4. After submit for a video: read-only for that video.
 5. No panel average, no peer scores, no AI totals unless a future “assist” flag is added (default off).
 
@@ -208,6 +214,8 @@ Judge (token auth, e.g. `Authorization: Bearer <token>` or path token):
 | `GET` | `/judge-access/{token}` | Entry + videos metadata (no peers) |
 | `GET` | `/judge-access/{token}/videos/{entry_video_id}/stream` | Authorized stream |
 | `PUT` | `/judge-access/{token}/videos/{entry_video_id}/fe` | Upsert draft FE |
+| `POST` | `/judge-access/{token}/videos/{entry_video_id}/technical-clicks` | Add timestamped +/− click |
+| `DELETE` | `/judge-access/{token}/videos/{entry_video_id}/technical-clicks/{click_id}` | Undo own click |
 | `POST` | `/judge-access/{token}/videos/{entry_video_id}/submit` | Submit FE |
 
 All judge endpoints must filter to the assignment bound to that token.
@@ -259,9 +267,11 @@ Migration path: existing owner accounts remain `user`; bootstrap one admin for t
 2. Docs: CreatorManual section + link from README.
 3. Optional: export panel FE into corpus / calibration CLI.
 
-### Phase F — v2 (later)
+### Phase F — Technical judging foundation ✅
 
-Clicker, click modes, event–click matching UI, richer calibration dashboard.
+Timestamped clicker, per-judge audit trails, head-judge comparison, and Analysis
+Review reference are built. Click modes, event–click consensus matching, offline
+capture, and a richer calibration dashboard remain on the roadmap.
 
 ## 14. Testing plan
 

@@ -364,14 +364,36 @@ from the owner **Review** workflow on a single analysis.
    - **A — Compare only:** human panel only; AI/shadow side-by-side
    - **B — Gap-fill:** AI fills blank panel categories from official analysis FE
    - **C — Equal vote:** official analysis FE counts as one virtual judge
-7. **Lock** the entry when done (`PATCH` status → `locked`).
+7. Expand **Head judge technical review** to inspect every judge's timestamped
+   click trail and compare the net-score range.
+8. **Lock judging** when done. Judges retain read access, but technical clicks
+   and FE scores can no longer be changed. Reopen only for a deliberate correction.
 
 ### Judge workflow
 
 1. Open the private invite URL (`/judge/{token}`) — no login required.
-2. Watch each video; enter Freestyle Evaluation (0–10 per category).
-3. **Save draft** or **Submit** (submitted scores are read-only).
-4. Links expire after **48 hours**; ask the admin for a new invite if expired.
+2. Start the video and use the large **+ / −** controls for technical scoring.
+   The right/left arrow keys are shortcuts. Every click stores the current video
+   timestamp; **Undo last** removes the most recent action.
+3. Enter Freestyle Evaluation (0–10 per category).
+4. **Save draft** or **Submit**. Submission locks both FE and technical clicks
+   for that video.
+5. Links expire after **48 hours**; ask the admin for a new invite if expired.
+
+### Analysis Review reference
+
+Analysis Review automatically finds judging entries for the same video. Its
+**Human judging reference** panel shows the panel net technical score, each
+judge's click trail, and aggregated FE. Click a timestamp to seek the analysis
+video. Human evidence is never silently blended into the deterministic AI score.
+
+The **Trick events** panel can switch from **AI scoring** to **Human comparison**.
+Human comparison assigns each counting judge click to the nearest detected trick
+when the click is inside its time range or within 1.5 seconds. Use **Human
+clicked** to inspect only tricks with judge evidence and **Disagreements** to find
+AI outcomes whose direction conflicts with the human net clicks. The full event
+table shows every matched raw click; unmatched clicks remain counted and are
+reported separately rather than forced onto a trick.
 
 ### Configuration
 

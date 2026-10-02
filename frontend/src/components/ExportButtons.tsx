@@ -33,6 +33,7 @@ interface ExportButtonsProps {
 export function ExportButtons({ analysisId, reviewState = "draft" }: ExportButtonsProps): JSX.Element {
   const [pendingExport, setPendingExport] = useState<string | null>(null);
   const [corpusMessage, setCorpusMessage] = useState<string | null>(null);
+  const [isOpen, setIsOpen] = useState(false);
 
   async function handleExport(
     key: string,
@@ -63,10 +64,24 @@ export function ExportButtons({ analysisId, reviewState = "draft" }: ExportButto
   }
 
   return (
-    <div className="flex flex-col gap-2">
-      <div className="flex flex-wrap gap-2">
+    <div className="relative flex flex-col items-end gap-2">
       <button
         type="button"
+        aria-haspopup="menu"
+        aria-expanded={isOpen}
+        onClick={() => setIsOpen((value) => !value)}
+        className="rounded-full border border-outline-default bg-surface-default px-4 py-2 text-sm font-semibold text-content-default hover:bg-surface-alt"
+      >
+        Export <span aria-hidden="true">⌄</span>
+      </button>
+      {isOpen ? (
+      <div
+        role="menu"
+        className="absolute right-0 top-11 z-20 flex w-64 flex-col gap-1 rounded-m border border-outline-soft bg-surface-default p-2 shadow-lg"
+      >
+      <button
+        type="button"
+        role="menuitem"
         disabled={pendingExport !== null}
         onClick={() =>
           handleExport(
@@ -75,12 +90,13 @@ export function ExportButtons({ analysisId, reviewState = "draft" }: ExportButto
             `yoyovision-analysis-${analysisId}.json`
           )
         }
-        className="rounded-full border border-outline-default px-4 py-2 text-sm font-semibold text-content-default hover:bg-surface-alt disabled:opacity-60"
+        className="rounded-s px-3 py-2 text-left text-sm font-medium text-content-default hover:bg-surface-alt disabled:opacity-60"
       >
         {pendingExport === "report" ? "Exporting..." : "Export report (JSON)"}
       </button>
       <button
         type="button"
+        role="menuitem"
         disabled={pendingExport !== null}
         onClick={() =>
           handleExport(
@@ -89,12 +105,13 @@ export function ExportButtons({ analysisId, reviewState = "draft" }: ExportButto
             `yoyovision-events-${analysisId}.csv`
           )
         }
-        className="rounded-full border border-outline-default px-4 py-2 text-sm font-semibold text-content-default hover:bg-surface-alt disabled:opacity-60"
+        className="rounded-s px-3 py-2 text-left text-sm font-medium text-content-default hover:bg-surface-alt disabled:opacity-60"
       >
         {pendingExport === "events" ? "Exporting..." : "Export events (CSV)"}
       </button>
       <button
         type="button"
+        role="menuitem"
         disabled={pendingExport !== null}
         onClick={() =>
           handleExport(
@@ -103,12 +120,13 @@ export function ExportButtons({ analysisId, reviewState = "draft" }: ExportButto
             `yoyovision-deductions-${analysisId}.csv`
           )
         }
-        className="rounded-full border border-outline-default px-4 py-2 text-sm font-semibold text-content-default hover:bg-surface-alt disabled:opacity-60"
+        className="rounded-s px-3 py-2 text-left text-sm font-medium text-content-default hover:bg-surface-alt disabled:opacity-60"
       >
         {pendingExport === "deductions" ? "Exporting..." : "Export deductions (CSV)"}
       </button>
       <button
         type="button"
+        role="menuitem"
         disabled={pendingExport !== null}
         onClick={() =>
           handleExport(
@@ -117,21 +135,23 @@ export function ExportButtons({ analysisId, reviewState = "draft" }: ExportButto
             `yoyovision-dataset-record-${analysisId}.json`
           )
         }
-        className="rounded-full border border-outline-default px-4 py-2 text-sm font-semibold text-content-default hover:bg-surface-alt disabled:opacity-60"
+        className="rounded-s px-3 py-2 text-left text-sm font-medium text-content-default hover:bg-surface-alt disabled:opacity-60"
       >
         {pendingExport === "dataset" ? "Exporting..." : "Export dataset record (JSON)"}
       </button>
       {reviewState === "submitted" ? (
         <button
           type="button"
+          role="menuitem"
           disabled={pendingExport !== null}
           onClick={() => void handleAddToCorpus()}
-          className="rounded-full border border-brand-primary-default bg-brand-primary-softest px-4 py-2 text-sm font-semibold text-brand-primary-boldest hover:bg-brand-primary-soft disabled:opacity-60"
+          className="rounded-s bg-brand-primary-softest px-3 py-2 text-left text-sm font-semibold text-brand-primary-boldest hover:bg-brand-primary-soft disabled:opacity-60"
         >
           {pendingExport === "corpus" ? "Adding..." : "Add to training corpus"}
         </button>
       ) : null}
       </div>
+      ) : null}
       {corpusMessage ? (
         <p role="status" className="text-sm text-content-dim">
           {corpusMessage}

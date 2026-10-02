@@ -8,13 +8,19 @@ from typing import Annotated
 from fastapi import APIRouter, Form, HTTPException, Query, UploadFile, status
 from fastapi.responses import Response
 from sqlalchemy import select
-from yoyovision_ml.domain import Division
+from yoyovision_ml.domain import Division, VideoSource
 from yoyovision_ml.media_validation import ALLOWED_MIME_TYPES
 
 from yoyovision_api.db_models import AnalysisJobORM, VideoAssetORM
 from yoyovision_api.deps import CurrentUser, DbSession, OwnedVideo, SettingsDep, StorageDep
-from yoyovision_api.schemas import AnalysisJobCreate, AnalysisJobRead, VideoAssetRead
+from yoyovision_api.schemas import (
+    AnalysisJobCreate,
+    AnalysisJobRead,
+    VideoAssetRead,
+    YoutubeImportCreate,
+)
 from yoyovision_api.security import MediaValidationError
+from yoyovision_api.services import youtube_import_service
 from yoyovision_api.services.job_service import create_and_dispatch_analysis_job
 from yoyovision_api.services.video_service import create_video_from_upload
 
@@ -29,6 +35,8 @@ async def upload_video(
     current_user: CurrentUser,
     file: UploadFile,
     division: Annotated[Division, Form()] = Division.ONE_A,
+    player_id: Annotated[str | None, Form(max_length=128)] = None,
+    rights_confirmed: Annotated[bool, Form()] = False,
 ) -> VideoAssetORM:
     if file.content_type not in ALLOWED_MIME_TYPES:
         raise HTTPException(
@@ -50,6 +58,8 @@ async def upload_video(
             original_filename=file.filename or "upload",
             declared_mime_type=file.content_type,
             file_bytes=file_bytes,
+            player_id=player_id.strip() if player_id else None,
+            rights_confirmed=rights_confirmed,
         )
     except MediaValidationError as exc:
         raise HTTPException(
@@ -61,6 +71,75 @@ async def upload_video(
     # Keep other divisions available for manual judging and dataset collection
     # without producing a misleading automated score.
     if division == Division.ONE_A:
+        await create_and_dispatch_analysis_job(session, settings, video)
+    await session.commit()
+    return video
+
+
+@router.post("/youtube", response_model=VideoAssetRead, status_code=status.HTTP_201_CREATED)
+async def import_youtube_video(
+    payload: YoutubeImportCreate,
+    session: DbSession,
+    storage: StorageDep,
+    settings: SettingsDep,
+    current_user: CurrentUser,
+) -> VideoAssetORM:
+    """Imports one user-authorized YouTube video through a canonical URL.
+
+    Only youtube.com/youtu.be IDs are accepted. The downloader never receives
+    an arbitrary user-controlled host, and the resulting bytes pass through
+    the same signature, size, duration, and ffprobe validation as uploads.
+    """
+    try:
+        external_id = youtube_import_service.parse_youtube_video_id(payload.url)
+        duplicate_result = await session.execute(
+            select(VideoAssetORM).where(
+                VideoAssetORM.owner_id == current_user.id,
+                VideoAssetORM.source_type == VideoSource.YOUTUBE,
+                VideoAssetORM.source_external_id == external_id,
+                VideoAssetORM.deleted_at.is_(None),
+            )
+        )
+        if duplicate_result.scalar_one_or_none() is not None:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={
+                    "code": "youtube_video_already_imported",
+                    "message": "This YouTube video is already in your library.",
+                },
+            )
+        downloaded = await youtube_import_service.download_youtube_video(
+            payload.url,
+            max_bytes=settings.storage_max_upload_bytes,
+            max_duration_ms=settings.storage_max_duration_ms,
+        )
+        video = await create_video_from_upload(
+            session=session,
+            storage=storage,
+            settings=settings,
+            owner=current_user,
+            division=payload.division,
+            original_filename=downloaded.title,
+            declared_mime_type=downloaded.mime_type,
+            file_bytes=downloaded.data,
+            source_type=VideoSource.YOUTUBE,
+            source_url=downloaded.canonical_url,
+            source_external_id=downloaded.external_id,
+            player_id=payload.player_id,
+            rights_confirmed=payload.rights_confirmed,
+        )
+    except youtube_import_service.YoutubeImportError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail={"code": exc.code, "message": exc.message},
+        ) from exc
+    except MediaValidationError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail={"code": exc.code, "message": exc.message},
+        ) from exc
+
+    if payload.division == Division.ONE_A:
         await create_and_dispatch_analysis_job(session, settings, video)
     await session.commit()
     return video

@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 import { formatConfidence, formatMsAsTimecode, titleCaseFromSnakeCase } from "@/lib/format";
+import type { HumanEventEvidence } from "@/lib/human-click-matching";
 import { lineItemReasonLabel, nonScoringFamilyBadge } from "@/lib/scoring-labels";
 import { DIFFICULTY_BANDS, EVENT_FAMILIES } from "@/lib/types";
 import type {
@@ -38,6 +39,8 @@ interface EventTableProps {
   activeEventId: string | null;
   onSeek: (ms: number) => void;
   readOnly?: boolean;
+  showHumanEvidence?: boolean;
+  humanEvidenceByEventId?: Map<string, HumanEventEvidence>;
 }
 
 /** Full add/edit/delete/confirm/reject editor for `AnalysisEvent` rows, per
@@ -52,6 +55,8 @@ export function EventTable({
   activeEventId,
   onSeek,
   readOnly = false,
+  showHumanEvidence = false,
+  humanEvidenceByEventId = new Map(),
 }: EventTableProps): JSX.Element {
   const updateEvent = useUpdateEvent(analysisId);
   const confirmEvent = useConfirmEvent(analysisId);
@@ -95,6 +100,7 @@ export function EventTable({
               <th className="px-3 py-2">Difficulty</th>
               <th className="px-3 py-2">Confidence</th>
               <th className="px-3 py-2">Pts</th>
+              {showHumanEvidence ? <th className="px-3 py-2">Human clicks</th> : null}
               <th className="px-3 py-2">Source</th>
               <th className="px-3 py-2">Status</th>
               <th className="px-3 py-2">Actions</th>
@@ -104,13 +110,24 @@ export function EventTable({
             {events.map((event) => {
               const isActive = event.id === activeEventId;
               const isCompleted = event.end_ms <= currentMs;
+              const humanEvidence = humanEvidenceByEventId.get(event.id);
               const rowClass = isActive
                 ? "bg-status-informative/10"
                 : isCompleted
                   ? "bg-status-positive/5"
                   : "";
               return (
-              <tr key={event.id} className={`border-t border-outline-softest ${rowClass}`}>
+              <tr
+                key={event.id}
+                onClick={(clickEvent) => {
+                  const target = clickEvent.target as HTMLElement;
+                  if (!target.closest("button, input, select, a, details, summary")) {
+                    onSeek(event.start_ms);
+                  }
+                }}
+                title={`Go to ${formatMsAsTimecode(event.start_ms)}`}
+                className={`cursor-pointer border-t border-outline-softest transition-colors hover:bg-status-informative/5 ${rowClass}`}
+              >
                 <td className="px-3 py-2">
                   <button
                     type="button"
@@ -232,6 +249,51 @@ export function EventTable({
                     );
                   })()}
                 </td>
+                {showHumanEvidence ? (
+                  <td className="px-3 py-2">
+                    {humanEvidence ? (
+                      <details className="min-w-32">
+                        <summary className="cursor-pointer font-semibold text-content-default">
+                          <span
+                            className={
+                              humanEvidence.net > 0
+                                ? "text-status-positive"
+                                : humanEvidence.net < 0
+                                  ? "text-status-alert"
+                                  : "text-content-subtle"
+                            }
+                          >
+                            {humanEvidence.net > 0 ? "+" : ""}
+                            {humanEvidence.net} net
+                          </span>
+                          <span className="ml-1 text-xs text-content-dim">
+                            (+{humanEvidence.positive}/−{humanEvidence.negative})
+                          </span>
+                        </summary>
+                        <div className="mt-2 flex max-w-56 flex-wrap gap-1">
+                          {humanEvidence.clicks.map((click) => (
+                            <button
+                              key={click.id}
+                              type="button"
+                              onClick={() => onSeek(click.timestamp_ms)}
+                              title={`${click.judgeName} · ${click.entryTitle}`}
+                              className={`rounded-full px-2 py-1 text-xs font-semibold ${
+                                click.kind === "positive"
+                                  ? "bg-status-positive/10 text-status-positive"
+                                  : "bg-status-alert/10 text-status-alert"
+                              }`}
+                            >
+                              {click.kind === "positive" ? "+" : "−"}{" "}
+                              {formatMsAsTimecode(click.timestamp_ms)}
+                            </button>
+                          ))}
+                        </div>
+                      </details>
+                    ) : (
+                      <span className="text-content-dim">No click</span>
+                    )}
+                  </td>
+                ) : null}
                 <td className="px-3 py-2 text-content-dim">{titleCaseFromSnakeCase(event.source)}</td>
                 <td className="px-3 py-2">
                   <span
@@ -281,7 +343,10 @@ export function EventTable({
             })}
             {events.length === 0 ? (
               <tr>
-                <td colSpan={10} className="px-3 py-4 text-center text-content-dim">
+                <td
+                  colSpan={showHumanEvidence ? 11 : 10}
+                  className="px-3 py-4 text-center text-content-dim"
+                >
                   No events detected yet.
                 </td>
               </tr>

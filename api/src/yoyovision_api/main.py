@@ -32,6 +32,8 @@ from yoyovision_api.routers import (
     judge_access,
     judging_entries,
     rulesets,
+    training_annotations,
+    tricks,
     videos,
 )
 
@@ -55,8 +57,8 @@ def create_app() -> FastAPI:
         title="YoYoVision API",
         version="0.1.0",
         description=(
-            "AI-assisted 1A yo-yo freestyle analysis platform. Training and "
-            "judge-assistance tool only -- scores are never certified by "
+            "Division-aware yo-yo training-data and judge-assistance platform, "
+            "with prototype automated analysis for 1A only. Scores are never certified by "
             "IYYF, WYYC, or any competition body."
         ),
         lifespan=lifespan,
@@ -107,6 +109,8 @@ def create_app() -> FastAPI:
 
     app.include_router(auth.router)
     app.include_router(videos.router)
+    app.include_router(training_annotations.router)
+    app.include_router(tricks.router)
     app.include_router(analyses.router)
     app.include_router(events.router)
     app.include_router(deductions.router)

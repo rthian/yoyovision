@@ -35,6 +35,20 @@ import type {
   JudgingEntryStatus,
   JudgingEntryResultsRead,
   Division,
+  TrainingAnnotation,
+  TrainingAnnotationCreate,
+  TrainingAnnotationUpdate,
+  TrainingRecord,
+  YoutubeImportCreate,
+  JudgeTechnicalClick,
+  TechnicalClickKind,
+  AnalysisHumanJudgingReference,
+  TrickCatalogCreate,
+  TrickCatalogEntry,
+  TrickCatalogUpdate,
+  TrickExample,
+  TrickExampleCreate,
+  TrickExampleUpdate,
 } from "@/lib/types";
 
 const API_BASE_URL =
@@ -180,11 +194,27 @@ export function getVideo(videoId: string): Promise<VideoAsset> {
   return request<VideoAsset>(`/videos/${videoId}`);
 }
 
-export function uploadVideo({ file, division }: { file: File; division: Division }): Promise<VideoAsset> {
+export function uploadVideo({
+  file,
+  division,
+  playerId,
+  rightsConfirmed,
+}: {
+  file: File;
+  division: Division;
+  playerId: string;
+  rightsConfirmed: boolean;
+}): Promise<VideoAsset> {
   const formData = new FormData();
   formData.append("file", file);
   formData.append("division", division);
+  formData.append("player_id", playerId);
+  formData.append("rights_confirmed", String(rightsConfirmed));
   return request<VideoAsset>("/videos", { method: "POST", body: formData });
+}
+
+export function importYoutubeVideo(payload: YoutubeImportCreate): Promise<VideoAsset> {
+  return request<VideoAsset>("/videos/youtube", { method: "POST", jsonBody: payload });
 }
 
 export function deleteVideo(videoId: string, hard = false): Promise<void> {
@@ -217,6 +247,99 @@ export function triggerVideoAnalysis(
 export async function fetchVideoBlobUrl(videoId: string): Promise<string> {
   const { blob } = await requestBlob(`/videos/${videoId}/stream`);
   return URL.createObjectURL(blob);
+}
+
+export function listTrainingAnnotations(videoId: string): Promise<TrainingAnnotation[]> {
+  return request<TrainingAnnotation[]>(`/videos/${videoId}/annotations`);
+}
+
+export function createTrainingAnnotation(
+  videoId: string,
+  payload: TrainingAnnotationCreate
+): Promise<TrainingAnnotation> {
+  return request<TrainingAnnotation>(`/videos/${videoId}/annotations`, {
+    method: "POST",
+    jsonBody: payload,
+  });
+}
+
+export function updateTrainingAnnotation(
+  videoId: string,
+  annotationId: string,
+  payload: TrainingAnnotationUpdate
+): Promise<TrainingAnnotation> {
+  return request<TrainingAnnotation>(`/videos/${videoId}/annotations/${annotationId}`, {
+    method: "PATCH",
+    jsonBody: payload,
+  });
+}
+
+export function deleteTrainingAnnotation(
+  videoId: string,
+  annotationId: string
+): Promise<void> {
+  return request<void>(`/videos/${videoId}/annotations/${annotationId}`, {
+    method: "DELETE",
+  });
+}
+
+export function getTrainingRecord(videoId: string): Promise<TrainingRecord> {
+  return request<TrainingRecord>(`/videos/${videoId}/training-record`);
+}
+
+// --------------------------------------------------------------------------- //
+// Trick library
+// --------------------------------------------------------------------------- //
+export function listTricks(options?: {
+  division?: Division;
+  search?: string;
+}): Promise<TrickCatalogEntry[]> {
+  return request<TrickCatalogEntry[]>("/tricks", { query: options });
+}
+
+export function createTrick(payload: TrickCatalogCreate): Promise<TrickCatalogEntry> {
+  return request<TrickCatalogEntry>("/tricks", { method: "POST", jsonBody: payload });
+}
+
+export function updateTrick(
+  trickId: string,
+  payload: TrickCatalogUpdate
+): Promise<TrickCatalogEntry> {
+  return request<TrickCatalogEntry>(`/tricks/${trickId}`, {
+    method: "PATCH",
+    jsonBody: payload,
+  });
+}
+
+export function deleteTrick(trickId: string): Promise<void> {
+  return request<void>(`/tricks/${trickId}`, { method: "DELETE" });
+}
+
+export function createTrickExample(
+  trickId: string,
+  payload: TrickExampleCreate
+): Promise<TrickExample> {
+  return request<TrickExample>(`/tricks/${trickId}/examples`, {
+    method: "POST",
+    jsonBody: payload,
+  });
+}
+
+export function updateTrickExample(
+  trickId: string,
+  exampleId: string,
+  payload: TrickExampleUpdate
+): Promise<TrickExample> {
+  return request<TrickExample>(`/tricks/${trickId}/examples/${exampleId}`, {
+    method: "PATCH",
+    jsonBody: payload,
+  });
+}
+
+export function deleteTrickExample(trickId: string, exampleId: string): Promise<void> {
+  return request<void>(`/tricks/${trickId}/examples/${exampleId}`, {
+    method: "DELETE",
+  });
 }
 
 // --------------------------------------------------------------------------- //
@@ -524,6 +647,38 @@ export function submitJudgeFe(
   });
 }
 
+export function addJudgeTechnicalClick(
+  token: string,
+  entryVideoId: string,
+  payload: { timestamp_ms: number; kind: TechnicalClickKind }
+): Promise<JudgeTechnicalClick> {
+  return judgeRequest<JudgeTechnicalClick>(
+    token,
+    `/videos/${entryVideoId}/technical-clicks`,
+    { method: "POST", jsonBody: payload }
+  );
+}
+
+export function deleteJudgeTechnicalClick(
+  token: string,
+  entryVideoId: string,
+  clickId: string
+): Promise<void> {
+  return judgeRequest<void>(
+    token,
+    `/videos/${entryVideoId}/technical-clicks/${clickId}`,
+    { method: "DELETE" }
+  );
+}
+
+export function getAnalysisHumanJudgingReference(
+  analysisId: string
+): Promise<AnalysisHumanJudgingReference> {
+  return request<AnalysisHumanJudgingReference>(
+    `/analyses/${analysisId}/human-judging-reference`
+  );
+}
+
 export async function fetchJudgeVideoBlobUrl(
   token: string,
   entryVideoId: string
@@ -562,6 +717,10 @@ export function updateJudgingEntry(
     method: "PATCH",
     jsonBody: payload,
   });
+}
+
+export function deleteJudgingEntry(entryId: string): Promise<void> {
+  return request<void>(`/judging-entries/${entryId}`, { method: "DELETE" });
 }
 
 export function addJudgeToEntry(

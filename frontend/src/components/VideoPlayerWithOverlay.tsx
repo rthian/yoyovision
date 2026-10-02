@@ -39,6 +39,7 @@ interface VideoPlayerWithOverlayProps {
   events: AnalysisEvent[];
   onTimeUpdateMs?: (ms: number) => void;
   seekToMs?: number | null;
+  seekRequestId?: number;
   routineStartMs?: number;
   routineEndMs?: number;
 }
@@ -48,6 +49,7 @@ export function VideoPlayerWithOverlay({
   events,
   onTimeUpdateMs,
   seekToMs,
+  seekRequestId,
   routineStartMs = 0,
   routineEndMs,
 }: VideoPlayerWithOverlayProps): JSX.Element {
@@ -201,7 +203,7 @@ export function VideoPlayerWithOverlay({
     }
     videoRef.current.currentTime = seekToMs / 1000;
     publishTime(seekToMs);
-  }, [seekToMs]);
+  }, [seekToMs, seekRequestId]);
 
   function handleTimeUpdate(event: React.SyntheticEvent<HTMLVideoElement>): void {
     publishTime(Math.round(event.currentTarget.currentTime * 1000));

@@ -2,8 +2,14 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { getJudgeAccess, submitJudgeFe, upsertJudgeFe } from "@/lib/api-client";
-import type { JudgeFreestyleScoreUpsert } from "@/lib/types";
+import {
+  addJudgeTechnicalClick,
+  deleteJudgeTechnicalClick,
+  getJudgeAccess,
+  submitJudgeFe,
+  upsertJudgeFe,
+} from "@/lib/api-client";
+import type { JudgeFreestyleScoreUpsert, TechnicalClickKind } from "@/lib/types";
 
 export function useJudgeAccess(token: string | undefined) {
   return useQuery({
@@ -30,6 +36,27 @@ export function useSubmitJudgeFe(token: string, entryVideoId: string) {
   return useMutation({
     mutationFn: (payload: JudgeFreestyleScoreUpsert) =>
       submitJudgeFe(token, entryVideoId, payload),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["judgeAccess", token] });
+    },
+  });
+}
+
+export function useAddJudgeTechnicalClick(token: string, entryVideoId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: { timestamp_ms: number; kind: TechnicalClickKind }) =>
+      addJudgeTechnicalClick(token, entryVideoId, payload),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["judgeAccess", token] });
+    },
+  });
+}
+
+export function useDeleteJudgeTechnicalClick(token: string, entryVideoId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (clickId: string) => deleteJudgeTechnicalClick(token, entryVideoId, clickId),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["judgeAccess", token] });
     },

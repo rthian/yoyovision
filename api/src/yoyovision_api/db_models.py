@@ -10,7 +10,17 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import JSON, Boolean, DateTime, Float, ForeignKey, Integer, String, UniqueConstraint, func
+from sqlalchemy import (
+    JSON,
+    Boolean,
+    DateTime,
+    Float,
+    ForeignKey,
+    Integer,
+    String,
+    UniqueConstraint,
+    func,
+)
 from sqlalchemy import Enum as SAEnum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from yoyovision_ml.domain import (
@@ -24,6 +34,8 @@ from yoyovision_ml.domain import (
     PipelineStage,
     ReviewStatus,
     Source,
+    TechnicalCredit,
+    VideoSource,
     VideoStatus,
 )
 
@@ -33,6 +45,7 @@ from yoyovision_api.judging_enums import (
     AiMixProfile,
     JudgingEntryMode,
     JudgingEntryStatus,
+    TechnicalClickKind,
     UserRole,
 )
 
@@ -81,6 +94,15 @@ class VideoAssetORM(Base):
     division: Mapped[Division] = mapped_column(
         _str_enum(Division, 4), nullable=False, default=Division.ONE_A
     )
+    source_type: Mapped[VideoSource] = mapped_column(
+        _str_enum(VideoSource, 16), nullable=False, default=VideoSource.UPLOAD
+    )
+    source_url: Mapped[str | None] = mapped_column(String(2048), nullable=True)
+    source_external_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    player_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    rights_confirmed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     original_filename: Mapped[str] = mapped_column(String(512), nullable=False)
     storage_key: Mapped[str] = mapped_column(String(512), nullable=False, unique=True)
     mime_type: Mapped[str] = mapped_column(String(128), nullable=False)
@@ -98,6 +120,12 @@ class VideoAssetORM(Base):
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     jobs: Mapped[list[AnalysisJobORM]] = relationship(
+        back_populates="video", cascade="all, delete-orphan"
+    )
+    training_annotations: Mapped[list[TrainingAnnotationORM]] = relationship(
+        back_populates="video", cascade="all, delete-orphan"
+    )
+    trick_examples: Mapped[list[TrickExampleORM]] = relationship(
         back_populates="video", cascade="all, delete-orphan"
     )
 
@@ -162,9 +190,7 @@ class AnalysisJobORM(Base):
     )
     #: Versioned scoring config applied to this analysis. Defaults from API
     #: settings at job creation; judges may switch rulesets during review.
-    ruleset_version: Mapped[str] = mapped_column(
-        String(32), nullable=False, default="1a-draft-0.1"
-    )
+    ruleset_version: Mapped[str] = mapped_column(String(32), nullable=False, default="1a-draft-0.1")
     #: Optional per-job adapter overrides merged over worker env at run time.
     pipeline_adapter_config: Mapped[dict[str, object] | None] = mapped_column(JSON, nullable=True)
 
@@ -214,6 +240,92 @@ class AnalysisEventORM(Base):
     )
 
     analysis: Mapped[AnalysisJobORM] = relationship(back_populates="events")
+
+
+class TrainingAnnotationORM(Base):
+    """Human-authored division-specific trick label independent of AI scoring."""
+
+    __tablename__ = "training_annotations"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    video_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("video_assets.id", ondelete="CASCADE"),
+        index=True,
+        nullable=False,
+    )
+    created_by: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), nullable=False)
+    division: Mapped[Division] = mapped_column(_str_enum(Division, 4), nullable=False)
+    label: Mapped[str] = mapped_column(String(128), nullable=False)
+    element_type: Mapped[str] = mapped_column(String(64), nullable=False)
+    start_ms: Mapped[int] = mapped_column(Integer, nullable=False)
+    end_ms: Mapped[int] = mapped_column(Integer, nullable=False)
+    outcome: Mapped[Outcome] = mapped_column(_str_enum(Outcome, 16), nullable=False)
+    technical_credit: Mapped[TechnicalCredit] = mapped_column(
+        _str_enum(TechnicalCredit, 24), nullable=False
+    )
+    notes: Mapped[str] = mapped_column(String(2048), nullable=False, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+    video: Mapped[VideoAssetORM] = relationship(back_populates="training_annotations")
+
+
+class TrickCatalogORM(Base):
+    """A canonical named trick with one or more cross-view video examples."""
+
+    __tablename__ = "trick_catalog"
+    __table_args__ = (
+        UniqueConstraint("owner_id", "division", "name", name="uq_trick_catalog_owner_name"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    owner_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    division: Mapped[Division] = mapped_column(_str_enum(Division, 4), nullable=False)
+    name: Mapped[str] = mapped_column(String(128), nullable=False)
+    aliases: Mapped[list[str]] = mapped_column(JSON, nullable=False, default=list)
+    description: Mapped[str] = mapped_column(String(2048), nullable=False, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+    examples: Mapped[list[TrickExampleORM]] = relationship(
+        back_populates="trick", cascade="all, delete-orphan", order_by="TrickExampleORM.created_at"
+    )
+
+
+class TrickExampleORM(Base):
+    """A labeled tutorial, alternate-view, or stage segment for a catalog trick."""
+
+    __tablename__ = "trick_examples"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    trick_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("trick_catalog.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    video_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("video_assets.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    created_by: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), nullable=False)
+    start_ms: Mapped[int] = mapped_column(Integer, nullable=False)
+    end_ms: Mapped[int] = mapped_column(Integer, nullable=False)
+    view_type: Mapped[str] = mapped_column(String(32), nullable=False)
+    camera_angle: Mapped[str] = mapped_column(String(64), nullable=False, default="")
+    playback_speed: Mapped[float] = mapped_column(Float, nullable=False, default=1.0)
+    notes: Mapped[str] = mapped_column(String(2048), nullable=False, default="")
+    is_primary: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+    trick: Mapped[TrickCatalogORM] = relationship(back_populates="examples")
+    video: Mapped[VideoAssetORM] = relationship(back_populates="trick_examples")
 
 
 class MajorDeductionORM(Base):
@@ -311,7 +423,9 @@ class JudgingEntryORM(Base):
     )
 
     videos: Mapped[list[JudgingEntryVideoORM]] = relationship(
-        back_populates="entry", cascade="all, delete-orphan", order_by="JudgingEntryVideoORM.sort_order"
+        back_populates="entry",
+        cascade="all, delete-orphan",
+        order_by="JudgingEntryVideoORM.sort_order",
     )
     judges: Mapped[list[JudgeAssignmentORM]] = relationship(
         back_populates="entry", cascade="all, delete-orphan"
@@ -326,9 +440,7 @@ class JudgingEntryVideoORM(Base):
     entry_id: Mapped[str] = mapped_column(
         String(36), ForeignKey("judging_entries.id", ondelete="CASCADE"), index=True, nullable=False
     )
-    video_id: Mapped[str] = mapped_column(
-        String(36), ForeignKey("video_assets.id"), nullable=False
-    )
+    video_id: Mapped[str] = mapped_column(String(36), ForeignKey("video_assets.id"), nullable=False)
     sort_order: Mapped[int] = mapped_column(Integer, nullable=False)
     official_analysis_id: Mapped[str | None] = mapped_column(
         String(36), ForeignKey("analysis_jobs.id"), nullable=True
@@ -365,6 +477,9 @@ class JudgeAssignmentORM(Base):
     freestyle_scores: Mapped[list[JudgeFreestyleScoreORM]] = relationship(
         back_populates="assignment", cascade="all, delete-orphan"
     )
+    technical_clicks: Mapped[list[JudgeTechnicalClickORM]] = relationship(
+        back_populates="assignment", cascade="all, delete-orphan"
+    )
 
 
 class JudgeFreestyleScoreORM(Base):
@@ -375,7 +490,10 @@ class JudgeFreestyleScoreORM(Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
     assignment_id: Mapped[str] = mapped_column(
-        String(36), ForeignKey("judge_assignments.id", ondelete="CASCADE"), index=True, nullable=False
+        String(36),
+        ForeignKey("judge_assignments.id", ondelete="CASCADE"),
+        index=True,
+        nullable=False,
     )
     entry_video_id: Mapped[str] = mapped_column(
         String(36), ForeignKey("judging_entry_videos.id", ondelete="CASCADE"), nullable=False
@@ -396,4 +514,32 @@ class JudgeFreestyleScoreORM(Base):
     )
 
     assignment: Mapped[JudgeAssignmentORM] = relationship(back_populates="freestyle_scores")
+    entry_video: Mapped[JudgingEntryVideoORM] = relationship()
+
+
+class JudgeTechnicalClickORM(Base):
+    """Timestamped human technical-judge action for later audit and comparison."""
+
+    __tablename__ = "judge_technical_clicks"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    assignment_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("judge_assignments.id", ondelete="CASCADE"),
+        index=True,
+        nullable=False,
+    )
+    entry_video_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("judging_entry_videos.id", ondelete="CASCADE"),
+        index=True,
+        nullable=False,
+    )
+    timestamp_ms: Mapped[int] = mapped_column(Integer, nullable=False)
+    kind: Mapped[TechnicalClickKind] = mapped_column(
+        _str_enum(TechnicalClickKind, 16), nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    assignment: Mapped[JudgeAssignmentORM] = relationship(back_populates="technical_clicks")
     entry_video: Mapped[JudgingEntryVideoORM] = relationship()

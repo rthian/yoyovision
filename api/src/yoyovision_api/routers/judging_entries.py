@@ -6,20 +6,19 @@ from fastapi import APIRouter, HTTPException, status
 from sqlalchemy import select
 
 from yoyovision_api.config import Settings
-from yoyovision_api.db_models import JudgingEntryORM, JudgingEntryVideoORM, JudgeAssignmentORM
+from yoyovision_api.db_models import JudgeAssignmentORM, JudgingEntryORM
 from yoyovision_api.deps import CurrentAdmin, DbSession, SettingsDep
-from yoyovision_api.judging_enums import JudgingEntryMode
 from yoyovision_api.schemas import (
     JudgeAssignmentCreate,
     JudgeAssignmentSummary,
     JudgeInviteRead,
     JudgingEntryCreate,
     JudgingEntryRead,
+    JudgingEntryResultsRead,
     JudgingEntryUpdate,
     JudgingEntryVideoAnalysisLink,
     JudgingEntryVideoAttach,
     JudgingEntryVideoRead,
-    JudgingEntryResultsRead,
 )
 from yoyovision_api.services import judging_results_service, judging_service
 
@@ -95,22 +94,24 @@ async def create_judging_entry(
     admin: CurrentAdmin,
     settings: SettingsDep,
 ) -> JudgingEntryRead:
-  try:
-      entry = await judging_service.create_entry(
-          session,
-          admin=admin,
-          title=payload.title,
-          mode=payload.mode,
-          division=payload.division,
-          ruleset_version=payload.ruleset_version or settings.ruleset_version,
-          ai_mix_profile=payload.ai_mix_profile,
-          aggregation_mode=payload.aggregation_mode,
-          due_at=payload.due_at,
-          video_ids=payload.video_ids,
-      )
-  except judging_service.JudgingServiceError as exc:
-      raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
-  return _entry_to_read(entry)
+    try:
+        entry = await judging_service.create_entry(
+            session,
+            admin=admin,
+            title=payload.title,
+            mode=payload.mode,
+            division=payload.division,
+            ruleset_version=payload.ruleset_version or settings.ruleset_version,
+            ai_mix_profile=payload.ai_mix_profile,
+            aggregation_mode=payload.aggregation_mode,
+            due_at=payload.due_at,
+            video_ids=payload.video_ids,
+        )
+    except judging_service.JudgingServiceError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        ) from exc
+    return _entry_to_read(entry)
 
 
 @router.get("", response_model=list[JudgingEntryRead])
@@ -130,8 +131,6 @@ async def get_judging_entry(
     return _entry_to_read(entry)
 
 
-
-
 @router.get("/{entry_id}/results", response_model=JudgingEntryResultsRead)
 async def get_judging_entry_results(
     entry_id: str,
@@ -147,6 +146,7 @@ async def get_judging_entry_results(
             else status.HTTP_422_UNPROCESSABLE_ENTITY
         )
         raise HTTPException(status_code=status_code, detail=str(exc)) from exc
+
 
 @router.patch("/{entry_id}", response_model=JudgingEntryRead)
 async def update_judging_entry(
@@ -179,6 +179,19 @@ async def update_judging_entry(
     return _entry_to_read(entry)
 
 
+@router.delete("/{entry_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_judging_entry(
+    entry_id: str,
+    session: DbSession,
+    admin: CurrentAdmin,
+) -> None:
+    try:
+        entry = await judging_service.get_entry(session, entry_id)
+        await judging_service.delete_entry(session, entry)
+    except judging_service.JudgingServiceError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+
+
 @router.post("/{entry_id}/videos", response_model=JudgingEntryRead)
 async def attach_videos(
     entry_id: str,
@@ -190,7 +203,9 @@ async def attach_videos(
         entry = await judging_service.get_entry(session, entry_id)
         entry = await judging_service.add_videos(session, entry, payload.video_ids)
     except judging_service.JudgingServiceError as exc:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        ) from exc
     return _entry_to_read(entry)
 
 
@@ -227,7 +242,9 @@ async def link_video_analyses(
     return _entry_to_read(entry)
 
 
-@router.post("/{entry_id}/judges", response_model=JudgeInviteRead, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/{entry_id}/judges", response_model=JudgeInviteRead, status_code=status.HTTP_201_CREATED
+)
 async def add_judge(
     entry_id: str,
     payload: JudgeAssignmentCreate,
@@ -245,7 +262,9 @@ async def add_judge(
             is_shadow=payload.is_shadow,
         )
     except judging_service.JudgingServiceError as exc:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        ) from exc
     return _invite_read(settings, entry, assignment, raw_token)
 
 

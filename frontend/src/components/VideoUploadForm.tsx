@@ -17,6 +17,8 @@ export function VideoUploadForm(): JSX.Element {
   const inputRef = useRef<HTMLInputElement>(null);
   const [error, setError] = useState<string | null>(null);
   const [division, setDivision] = useState<Division>("1A");
+  const [playerId, setPlayerId] = useState("");
+  const [rightsConfirmed, setRightsConfirmed] = useState(false);
 
   async function handleFileChange(event: ChangeEvent<HTMLInputElement>): Promise<void> {
     const file = event.target.files?.[0];
@@ -25,7 +27,7 @@ export function VideoUploadForm(): JSX.Element {
     }
     setError(null);
     try {
-      await uploadVideo.mutateAsync({ file, division });
+      await uploadVideo.mutateAsync({ file, division, playerId, rightsConfirmed });
     } catch (err) {
       setError(
         err instanceof ApiError
@@ -62,11 +64,29 @@ export function VideoUploadForm(): JSX.Element {
           ))}
         </select>
         <input
+          type="text"
+          required
+          value={playerId}
+          onChange={(event) => setPlayerId(event.target.value)}
+          placeholder="Performer ID, e.g. competitor-042"
+          disabled={uploadVideo.isPending}
+          className="h-10 rounded-s border border-outline-default px-3 text-sm"
+        />
+        <span className="flex items-start gap-2 text-sm text-content-dim">
+          <input
+            type="checkbox"
+            checked={rightsConfirmed}
+            onChange={(event) => setRightsConfirmed(event.target.checked)}
+            className="mt-1"
+          />
+          I have permission to use this video for model training.
+        </span>
+        <input
           ref={inputRef}
           type="file"
           accept={ACCEPTED_MIME_TYPES.join(",")}
           onChange={handleFileChange}
-          disabled={uploadVideo.isPending}
+          disabled={uploadVideo.isPending || !playerId.trim() || !rightsConfirmed}
           className="mt-2 text-sm"
         />
       </label>

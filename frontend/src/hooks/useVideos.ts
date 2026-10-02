@@ -7,12 +7,13 @@ import {
   deleteAnalysis,
   deleteVideo,
   getVideo,
+  importYoutubeVideo,
   listVideoAnalyses,
   listVideos,
   triggerVideoAnalysis,
   uploadVideo,
 } from "@/lib/api-client";
-import type { PipelineAdapterConfig } from "@/lib/types";
+import type { PipelineAdapterConfig, YoutubeImportCreate } from "@/lib/types";
 
 export const videosQueryKey = ["videos"] as const;
 export const videoQueryKey = (videoId: string) => ["videos", videoId] as const;
@@ -56,6 +57,16 @@ export function useUploadVideo() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: uploadVideo,
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: videosQueryKey });
+    },
+  });
+}
+
+export function useImportYoutubeVideo() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: YoutubeImportCreate) => importYoutubeVideo(payload),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: videosQueryKey });
     },

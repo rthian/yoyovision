@@ -5,6 +5,8 @@ from __future__ import annotations
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
+from yoyovision_ml.scoring.judges import FE_CATEGORIES, aggregate_judge_scores
+from yoyovision_ml.scoring.types import JudgeFreestyleScore
 
 from yoyovision_api.db_models import (
     FreestyleEvaluationORM,
@@ -13,16 +15,17 @@ from yoyovision_api.db_models import (
     JudgingEntryORM,
     JudgingEntryVideoORM,
 )
-from yoyovision_api.judging_enums import AiMixProfile, AggregationMode
+from yoyovision_api.judging_enums import AggregationMode, AiMixProfile
 from yoyovision_api.schemas import (
+    AnalysisHumanJudgingReferenceRead,
     FeCategoryScores,
+    HumanJudgingEntryReference,
     JudgeResultRow,
+    JudgeTechnicalClickRead,
     JudgingEntryResultsRead,
     VideoResults,
 )
 from yoyovision_api.services.judging_service import JudgingServiceError
-from yoyovision_ml.scoring.judges import FE_CATEGORIES, aggregate_judge_scores
-from yoyovision_ml.scoring.types import JudgeFreestyleScore
 
 AI_JUDGE_ID = "__ai__"
 
@@ -55,7 +58,9 @@ def _scores_from_evaluation(evaluation) -> FeCategoryScores:
     )
 
 
-def _orm_to_ml_score(assignment: JudgeAssignmentORM, score: JudgeFreestyleScoreORM) -> JudgeFreestyleScore:
+def _orm_to_ml_score(
+    assignment: JudgeAssignmentORM, score: JudgeFreestyleScoreORM
+) -> JudgeFreestyleScore:
     return JudgeFreestyleScore(
         judge_id=assignment.id,
         execution=score.execution,
@@ -119,9 +124,7 @@ def _apply_profile_c(
         return _scores_from_evaluation(evaluation), False, warnings
 
     combined = [*human_scores, _ml_score_from_fe(ai_fe, judge_id=AI_JUDGE_ID)]
-    evaluation, agg_warnings = aggregate_judge_scores(
-        combined, mode=_aggregation_mode_value(mode)
-    )
+    evaluation, agg_warnings = aggregate_judge_scores(combined, mode=_aggregation_mode_value(mode))
     warnings.extend(agg_warnings)
     return _scores_from_evaluation(evaluation), True, warnings
 
@@ -132,9 +135,7 @@ async def _load_fe_map(
     if not analysis_ids:
         return {}
     result = await session.execute(
-        select(FreestyleEvaluationORM).where(
-            FreestyleEvaluationORM.analysis_id.in_(analysis_ids)
-        )
+        select(FreestyleEvaluationORM).where(FreestyleEvaluationORM.analysis_id.in_(analysis_ids))
     )
     return {row.analysis_id: row for row in result.scalars().all()}
 
@@ -146,6 +147,7 @@ async def compute_entry_results(session: AsyncSession, entry_id: str) -> Judging
         .options(
             selectinload(JudgingEntryORM.videos).selectinload(JudgingEntryVideoORM.video),
             selectinload(JudgingEntryORM.judges).selectinload(JudgeAssignmentORM.freestyle_scores),
+            selectinload(JudgingEntryORM.judges).selectinload(JudgeAssignmentORM.technical_clicks),
         )
     )
     entry = result.scalar_one_or_none()
@@ -169,40 +171,66 @@ async def compute_entry_results(session: AsyncSession, entry_id: str) -> Judging
         video_warnings: list[str] = []
         judge_rows: list[JudgeResultRow] = []
         aggregate_pool: list[JudgeFreestyleScore] = []
+        included_technical_nets: list[int] = []
 
         for assignment in entry.judges:
             score = next(
-                (row for row in assignment.freestyle_scores if row.entry_video_id == entry_video.id),
+                (
+                    row
+                    for row in assignment.freestyle_scores
+                    if row.entry_video_id == entry_video.id
+                ),
                 None,
             )
-            if score is None:
+            clicks = sorted(
+                (
+                    click
+                    for click in assignment.technical_clicks
+                    if click.entry_video_id == entry_video.id
+                ),
+                key=lambda click: (click.timestamp_ms, click.created_at),
+            )
+            if score is None and not clicks:
                 continue
             included = (
-                score.is_submitted
+                score is not None
+                and score.is_submitted
                 and assignment.include_in_results
                 and not assignment.is_shadow
             )
             if included:
+                assert score is not None
                 aggregate_pool.append(_orm_to_ml_score(assignment, score))
+            positive_clicks = sum(click.kind.value == "positive" for click in clicks)
+            negative_clicks = sum(click.kind.value == "negative" for click in clicks)
+            net_clicks = positive_clicks - negative_clicks
+            if included:
+                included_technical_nets.append(net_clicks)
             judge_rows.append(
                 JudgeResultRow(
                     assignment_id=assignment.id,
                     display_name=assignment.display_name,
                     include_in_results=assignment.include_in_results,
                     is_shadow=assignment.is_shadow,
-                    is_submitted=score.is_submitted,
+                    is_submitted=score.is_submitted if score is not None else False,
                     included_in_aggregate=included,
                     scores=FeCategoryScores(
-                        execution=score.execution,
-                        control=score.control,
-                        trick_diversity=score.trick_diversity,
-                        space_use_emphasis=score.space_use_emphasis,
-                        music_choreography=score.music_choreography,
-                        music_construction=score.music_construction,
-                        body_control=score.body_control,
-                        showmanship=score.showmanship,
+                        execution=score.execution if score is not None else None,
+                        control=score.control if score is not None else None,
+                        trick_diversity=score.trick_diversity if score is not None else None,
+                        space_use_emphasis=score.space_use_emphasis if score is not None else None,
+                        music_choreography=score.music_choreography if score is not None else None,
+                        music_construction=score.music_construction if score is not None else None,
+                        body_control=score.body_control if score is not None else None,
+                        showmanship=score.showmanship if score is not None else None,
                     ),
-                    notes=score.notes,
+                    notes=score.notes if score is not None else "",
+                    positive_clicks=positive_clicks,
+                    negative_clicks=negative_clicks,
+                    net_technical_clicks=net_clicks,
+                    technical_clicks=[
+                        JudgeTechnicalClickRead.model_validate(click) for click in clicks
+                    ],
                 )
             )
 
@@ -263,6 +291,16 @@ async def compute_entry_results(session: AsyncSession, entry_id: str) -> Judging
                 ai_virtual_judge_included=ai_virtual,
                 effective_aggregation_mode=mode_value,
                 warnings=video_warnings,
+                panel_net_technical_clicks=(
+                    round(sum(included_technical_nets) / len(included_technical_nets), 3)
+                    if included_technical_nets
+                    else None
+                ),
+                technical_click_range=(
+                    max(included_technical_nets) - min(included_technical_nets)
+                    if included_technical_nets
+                    else None
+                ),
             )
         )
 
@@ -276,4 +314,49 @@ async def compute_entry_results(session: AsyncSession, entry_id: str) -> Judging
         aggregation_mode=entry.aggregation_mode,
         videos=video_results,
         warnings=entry_warnings,
+    )
+
+
+async def compute_analysis_human_reference(
+    session: AsyncSession,
+    *,
+    analysis_id: str,
+    video_id: str,
+) -> AnalysisHumanJudgingReferenceRead:
+    """Collect human judging panels for the analysis video.
+
+    The association is video-based so a panel remains useful as reference even
+    when an admin did not explicitly attach this exact analysis run to the entry.
+    Human results stay separate from the deterministic AI score.
+    """
+    result = await session.execute(
+        select(JudgingEntryVideoORM).where(JudgingEntryVideoORM.video_id == video_id)
+    )
+    entry_video_rows = list(result.scalars().all())
+    entries: list[HumanJudgingEntryReference] = []
+    seen_entry_ids: set[str] = set()
+    for row in entry_video_rows:
+        if row.entry_id in seen_entry_ids:
+            continue
+        seen_entry_ids.add(row.entry_id)
+        panel = await compute_entry_results(session, row.entry_id)
+        video = next((item for item in panel.videos if item.video_id == video_id), None)
+        if video is None:
+            continue
+        entries.append(
+            HumanJudgingEntryReference(
+                entry_id=panel.entry_id,
+                title=panel.title,
+                mode=panel.mode,
+                status=panel.status,
+                judges=video.judges,
+                panel_net_technical_clicks=video.panel_net_technical_clicks,
+                technical_click_range=video.technical_click_range,
+                panel_freestyle=video.panel_aggregate,
+            )
+        )
+    return AnalysisHumanJudgingReferenceRead(
+        analysis_id=analysis_id,
+        video_id=video_id,
+        entries=entries,
     )
