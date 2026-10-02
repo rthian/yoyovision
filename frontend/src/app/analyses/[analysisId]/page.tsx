@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import { useState } from "react";
 
 import { AuthGate } from "@/components/AuthGate";
+import { AnalysisTrainingContext } from "@/components/AnalysisTrainingContext";
 import { CompactEventFeed } from "@/components/CompactEventFeed";
 import { DeductionTable } from "@/components/DeductionTable";
 import { EventTable } from "@/components/EventTable";
@@ -23,12 +24,13 @@ import { useAnalysisJob, useReopenAnalysis, useScore, useScoreLineItems, useSubm
 import type { TechnicalLineItem } from "@/lib/types";
 import { computeLiveScorePreview } from "@/lib/live-score-preview";
 import { formatMsAsTimecode } from "@/lib/format";
-import { resolveRoutineWindow } from "@/lib/routine-window";
+import { eventInRoutine, resolveRoutineWindow } from "@/lib/routine-window";
 import { useAuth } from "@/hooks/useAuth";
 import { useDeductions } from "@/hooks/useDeductions";
 import { useEvaluation } from "@/hooks/useEvaluation";
 import { useEvents } from "@/hooks/useEvents";
 import { useRuleset, useRulesets } from "@/hooks/useRulesets";
+import { useTrainingAnnotations } from "@/hooks/useTrainingAnnotations";
 import { useVideo } from "@/hooks/useVideos";
 import { useVideoBlobUrl } from "@/hooks/useVideoBlobUrl";
 
@@ -54,6 +56,10 @@ function AnalysisReview({ analysisId }: { analysisId: string }): JSX.Element {
 
   const videoQuery = useVideo(job?.video_id ?? "", isAuthenticated && Boolean(job));
   const { blobUrl } = useVideoBlobUrl(job?.video_id, isAuthenticated && Boolean(job));
+  const trainingAnnotationsQuery = useTrainingAnnotations(
+    job?.video_id ?? "",
+    isAuthenticated && Boolean(job)
+  );
 
   const eventsQuery = useEvents(analysisId, isAuthenticated);
   const deductionsQuery = useDeductions(analysisId, isAuthenticated);
@@ -71,7 +77,14 @@ function AnalysisReview({ analysisId }: { analysisId: string }): JSX.Element {
   const rulesetsQuery = useRulesets(isAuthenticated);
   const updateRuleset = useUpdateAnalysisRuleset(analysisId);
 
-  const events = eventsQuery.data ?? [];
+  const allEvents = eventsQuery.data ?? [];
+  const videoDurationMs = videoQuery.data?.duration_ms ?? 0;
+  const routineWindow =
+    job?.status === "completed" ? resolveRoutineWindow(job, videoDurationMs) : null;
+  const events = routineWindow
+    ? allEvents.filter((event) => eventInRoutine(event, routineWindow))
+    : allEvents;
+  const outsideRoutineEventCount = allEvents.length - events.length;
   const reviewedEventCount = events.filter((event) => event.review_status !== "pending").length;
   const reviewProgress = events.length > 0 ? Math.round((reviewedEventCount / events.length) * 100) : 0;
   const filterCounts: Record<ReviewFilter, number> = {
@@ -105,9 +118,6 @@ function AnalysisReview({ analysisId }: { analysisId: string }): JSX.Element {
   const score = scoreQuery.data ?? null;
   const ruleset = rulesetQuery.data ?? null;
   const deductions = deductionsQuery.data ?? [];
-  const videoDurationMs = videoQuery.data?.duration_ms ?? 0;
-  const routineWindow =
-    job?.status === "completed" ? resolveRoutineWindow(job, videoDurationMs) : null;
   const livePreview =
     score && job?.status === "completed" && routineWindow
       ? computeLiveScorePreview(
@@ -135,9 +145,11 @@ function AnalysisReview({ analysisId }: { analysisId: string }): JSX.Element {
   const activeEventLabel =
     events.find((event) => event.id === livePreview?.active_event_id)?.label ?? null;
   const lastEventEndMs = events.reduce((max, event) => Math.max(max, event.end_ms), 0);
-  const timelineDurationMs = Math.max(videoDurationMs, lastEventEndMs);
+  const timelineDurationMs = videoDurationMs;
   const eventCoverageShort =
-    videoDurationMs > 0 && lastEventEndMs > 0 && lastEventEndMs < videoDurationMs * 0.9;
+    routineWindow !== null &&
+    events.length > 0 &&
+    lastEventEndMs < routineWindow.endMs - (routineWindow.endMs - routineWindow.startMs) * 0.1;
   const isLocked = (job?.review_state ?? "draft") === "submitted";
 
   if (jobQuery.isLoading) {
@@ -291,9 +303,9 @@ function AnalysisReview({ analysisId }: { analysisId: string }): JSX.Element {
           role="status"
           className="rounded-m border border-status-notice/30 bg-status-notice/10 px-4 py-3 text-sm text-status-notice"
         >
-          Detected tricks only cover about {formatMsAsTimecode(lastEventEndMs)} of this{" "}
-          {formatMsAsTimecode(videoDurationMs)} video. Re-run analysis on this video to refresh
-          event detection across the full routine.
+          The last detected trick ends at {formatMsAsTimecode(lastEventEndMs)}, before the routine
+          ends at {formatMsAsTimecode(routineWindow?.endMs ?? videoDurationMs)}. Re-run analysis
+          to refresh detection across the full routine.
         </p>
       ) : null}
 
@@ -329,7 +341,7 @@ function AnalysisReview({ analysisId }: { analysisId: string }): JSX.Element {
             <div>
               <h2 className="text-lg font-semibold text-content-default">Trick events</h2>
               <p className="text-sm text-content-dim">
-                Live feed · {Math.min(8, events.length)} of {events.length}
+                In routine · {Math.min(8, events.length)} of {events.length}
               </p>
             </div>
             <button
@@ -350,6 +362,21 @@ function AnalysisReview({ analysisId }: { analysisId: string }): JSX.Element {
           />
         </section>
       </div>
+
+      {outsideRoutineEventCount > 0 ? (
+        <p className="rounded-s border border-outline-soft bg-surface-alt px-3 py-2 text-sm text-content-dim">
+          {outsideRoutineEventCount} detected event{outsideRoutineEventCount === 1 ? " is" : "s are"} outside the routine window and hidden. They receive no technical points.
+        </p>
+      ) : null}
+
+      <AnalysisTrainingContext
+        videoId={job.video_id}
+        annotations={trainingAnnotationsQuery.data ?? []}
+        isLoading={trainingAnnotationsQuery.isLoading}
+        routineWindow={routineWindow}
+        modelVersions={job.model_versions}
+        onSeek={handleSeek}
+      />
 
       {showFullEventTable ? (
         <section className="flex flex-col gap-3">
