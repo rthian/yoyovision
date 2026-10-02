@@ -125,6 +125,9 @@ class VideoAssetORM(Base):
     training_annotations: Mapped[list[TrainingAnnotationORM]] = relationship(
         back_populates="video", cascade="all, delete-orphan"
     )
+    trick_examples: Mapped[list[TrickExampleORM]] = relationship(
+        back_populates="video", cascade="all, delete-orphan"
+    )
 
 
 class AnalysisJobORM(Base):
@@ -268,6 +271,61 @@ class TrainingAnnotationORM(Base):
     )
 
     video: Mapped[VideoAssetORM] = relationship(back_populates="training_annotations")
+
+
+class TrickCatalogORM(Base):
+    """A canonical named trick with one or more cross-view video examples."""
+
+    __tablename__ = "trick_catalog"
+    __table_args__ = (
+        UniqueConstraint("owner_id", "division", "name", name="uq_trick_catalog_owner_name"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    owner_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    division: Mapped[Division] = mapped_column(_str_enum(Division, 4), nullable=False)
+    name: Mapped[str] = mapped_column(String(128), nullable=False)
+    aliases: Mapped[list[str]] = mapped_column(JSON, nullable=False, default=list)
+    description: Mapped[str] = mapped_column(String(2048), nullable=False, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+    examples: Mapped[list[TrickExampleORM]] = relationship(
+        back_populates="trick", cascade="all, delete-orphan", order_by="TrickExampleORM.created_at"
+    )
+
+
+class TrickExampleORM(Base):
+    """A labeled tutorial, alternate-view, or stage segment for a catalog trick."""
+
+    __tablename__ = "trick_examples"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    trick_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("trick_catalog.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    video_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("video_assets.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    created_by: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), nullable=False)
+    start_ms: Mapped[int] = mapped_column(Integer, nullable=False)
+    end_ms: Mapped[int] = mapped_column(Integer, nullable=False)
+    view_type: Mapped[str] = mapped_column(String(32), nullable=False)
+    camera_angle: Mapped[str] = mapped_column(String(64), nullable=False, default="")
+    playback_speed: Mapped[float] = mapped_column(Float, nullable=False, default=1.0)
+    notes: Mapped[str] = mapped_column(String(2048), nullable=False, default="")
+    is_primary: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+    trick: Mapped[TrickCatalogORM] = relationship(back_populates="examples")
+    video: Mapped[VideoAssetORM] = relationship(back_populates="trick_examples")
 
 
 class MajorDeductionORM(Base):

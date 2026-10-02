@@ -183,6 +183,77 @@ export interface TrainingAnnotationCreate {
 
 export type TrainingAnnotationUpdate = Partial<TrainingAnnotationCreate>;
 
+export type TrickViewType =
+  | "tutorial"
+  | "slow_motion"
+  | "full_speed"
+  | "alternate_angle"
+  | "stage"
+  | "other";
+
+export const TRICK_VIEW_TYPES: TrickViewType[] = [
+  "tutorial",
+  "slow_motion",
+  "full_speed",
+  "alternate_angle",
+  "stage",
+  "other",
+];
+
+export interface TrickExample {
+  id: string;
+  trick_id: string;
+  video_id: string;
+  start_ms: number;
+  end_ms: number;
+  view_type: TrickViewType;
+  camera_angle: string;
+  playback_speed: number;
+  notes: string;
+  is_primary: boolean;
+  original_filename: string;
+  source_type: VideoSource;
+  source_url: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TrickCatalogEntry {
+  id: string;
+  owner_id: string;
+  division: Division;
+  name: string;
+  aliases: string[];
+  description: string;
+  examples: TrickExample[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TrickCatalogCreate {
+  name: string;
+  division: Division;
+  aliases: string[];
+  description?: string;
+}
+
+export type TrickCatalogUpdate = Partial<
+  Pick<TrickCatalogCreate, "name" | "aliases" | "description">
+>;
+
+export interface TrickExampleCreate {
+  video_id: string;
+  start_ms: number;
+  end_ms: number;
+  view_type: TrickViewType;
+  camera_angle?: string;
+  playback_speed?: number;
+  notes?: string;
+  is_primary?: boolean;
+}
+
+export type TrickExampleUpdate = Partial<Omit<TrickExampleCreate, "video_id">>;
+
 export interface TrainingRecord {
   record_id: string;
   video: {

@@ -29,6 +29,19 @@ export function NavBar(): JSX.Element {
         ) : null}
         {isAuthenticated && !isJudgeRoute ? (
           <Link
+            href="/tricks"
+            aria-current={pathname.startsWith("/tricks") ? "page" : undefined}
+            className={`rounded-full px-3 py-2 text-sm font-semibold ${
+              pathname.startsWith("/tricks")
+                ? "bg-brand-primary-softest text-brand-boldest"
+                : "text-content-subtle hover:bg-surface-alt"
+            }`}
+          >
+            Trick Library
+          </Link>
+        ) : null}
+        {isAuthenticated && !isJudgeRoute ? (
+          <Link
             href="/admin/judging-entries"
             aria-current={pathname.startsWith("/admin/judging-entries") ? "page" : undefined}
             className={`rounded-full px-3 py-2 text-sm font-semibold ${

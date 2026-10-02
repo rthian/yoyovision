@@ -43,6 +43,12 @@ import type {
   JudgeTechnicalClick,
   TechnicalClickKind,
   AnalysisHumanJudgingReference,
+  TrickCatalogCreate,
+  TrickCatalogEntry,
+  TrickCatalogUpdate,
+  TrickExample,
+  TrickExampleCreate,
+  TrickExampleUpdate,
 } from "@/lib/types";
 
 const API_BASE_URL =
@@ -279,6 +285,61 @@ export function deleteTrainingAnnotation(
 
 export function getTrainingRecord(videoId: string): Promise<TrainingRecord> {
   return request<TrainingRecord>(`/videos/${videoId}/training-record`);
+}
+
+// --------------------------------------------------------------------------- //
+// Trick library
+// --------------------------------------------------------------------------- //
+export function listTricks(options?: {
+  division?: Division;
+  search?: string;
+}): Promise<TrickCatalogEntry[]> {
+  return request<TrickCatalogEntry[]>("/tricks", { query: options });
+}
+
+export function createTrick(payload: TrickCatalogCreate): Promise<TrickCatalogEntry> {
+  return request<TrickCatalogEntry>("/tricks", { method: "POST", jsonBody: payload });
+}
+
+export function updateTrick(
+  trickId: string,
+  payload: TrickCatalogUpdate
+): Promise<TrickCatalogEntry> {
+  return request<TrickCatalogEntry>(`/tricks/${trickId}`, {
+    method: "PATCH",
+    jsonBody: payload,
+  });
+}
+
+export function deleteTrick(trickId: string): Promise<void> {
+  return request<void>(`/tricks/${trickId}`, { method: "DELETE" });
+}
+
+export function createTrickExample(
+  trickId: string,
+  payload: TrickExampleCreate
+): Promise<TrickExample> {
+  return request<TrickExample>(`/tricks/${trickId}/examples`, {
+    method: "POST",
+    jsonBody: payload,
+  });
+}
+
+export function updateTrickExample(
+  trickId: string,
+  exampleId: string,
+  payload: TrickExampleUpdate
+): Promise<TrickExample> {
+  return request<TrickExample>(`/tricks/${trickId}/examples/${exampleId}`, {
+    method: "PATCH",
+    jsonBody: payload,
+  });
+}
+
+export function deleteTrickExample(trickId: string, exampleId: string): Promise<void> {
+  return request<void>(`/tricks/${trickId}/examples/${exampleId}`, {
+    method: "DELETE",
+  });
 }
 
 // --------------------------------------------------------------------------- //

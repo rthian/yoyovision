@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useState } from "react";
 
@@ -68,6 +69,14 @@ function VideoDetail({ videoId }: { videoId: string }): JSX.Element {
             View source video
           </a>
         ) : null}
+        <div className="mt-3">
+          <Link
+            href={`/tricks?videoId=${video.id}&division=${video.division}`}
+            className="inline-flex rounded-full border border-outline-default px-4 py-2 text-sm font-semibold text-content-subtle hover:bg-surface-alt"
+          >
+            Add video segment to Trick Library
+          </Link>
+        </div>
       </div>
 
       <TrainingAnnotationPanel videoId={videoId} durationMs={video.duration_ms ?? 0} />

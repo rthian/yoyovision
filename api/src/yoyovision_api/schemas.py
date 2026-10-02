@@ -115,6 +115,109 @@ class TrainingAnnotationRead(BaseModel):
     updated_at: datetime
 
 
+TrickViewType = Literal[
+    "tutorial",
+    "slow_motion",
+    "full_speed",
+    "alternate_angle",
+    "stage",
+    "other",
+]
+
+
+class TrickCatalogCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=128)
+    division: Division
+    aliases: list[str] = Field(default_factory=list, max_length=20)
+    description: str = Field(default="", max_length=2048)
+
+    @field_validator("name")
+    @classmethod
+    def _clean_name(cls, value: str) -> str:
+        clean = value.strip()
+        if not clean:
+            raise ValueError("Trick name is required.")
+        return clean
+
+    @field_validator("aliases")
+    @classmethod
+    def _clean_aliases(cls, values: list[str]) -> list[str]:
+        return list(dict.fromkeys(value.strip() for value in values if value.strip()))
+
+
+class TrickCatalogUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=128)
+    aliases: list[str] | None = Field(default=None, max_length=20)
+    description: str | None = Field(default=None, max_length=2048)
+
+    @field_validator("name")
+    @classmethod
+    def _clean_optional_name(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        clean = value.strip()
+        if not clean:
+            raise ValueError("Trick name is required.")
+        return clean
+
+
+class TrickExampleCreate(BaseModel):
+    video_id: str
+    start_ms: int = Field(ge=0)
+    end_ms: int = Field(gt=0)
+    view_type: TrickViewType
+    camera_angle: str = Field(default="", max_length=64)
+    playback_speed: float = Field(default=1.0, gt=0, le=4.0)
+    notes: str = Field(default="", max_length=2048)
+    is_primary: bool = False
+
+    @model_validator(mode="after")
+    def _end_after_start(self) -> TrickExampleCreate:
+        if self.end_ms <= self.start_ms:
+            raise ValueError("end_ms must be greater than start_ms")
+        return self
+
+
+class TrickExampleUpdate(BaseModel):
+    start_ms: int | None = Field(default=None, ge=0)
+    end_ms: int | None = Field(default=None, gt=0)
+    view_type: TrickViewType | None = None
+    camera_angle: str | None = Field(default=None, max_length=64)
+    playback_speed: float | None = Field(default=None, gt=0, le=4.0)
+    notes: str | None = Field(default=None, max_length=2048)
+    is_primary: bool | None = None
+
+
+class TrickExampleRead(BaseModel):
+    id: str
+    trick_id: str
+    video_id: str
+    start_ms: int
+    end_ms: int
+    view_type: TrickViewType
+    camera_angle: str
+    playback_speed: float
+    notes: str
+    is_primary: bool
+    original_filename: str
+    source_type: VideoSource
+    source_url: str | None
+    created_at: datetime
+    updated_at: datetime
+
+
+class TrickCatalogRead(BaseModel):
+    id: str
+    owner_id: str
+    division: Division
+    name: str
+    aliases: list[str]
+    description: str
+    examples: list[TrickExampleRead]
+    created_at: datetime
+    updated_at: datetime
+
+
 class AnalysisJobRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

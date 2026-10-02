@@ -15,12 +15,16 @@ export function useVideoBlobUrl(videoId: string | undefined, enabled: boolean) {
 
   useEffect(() => {
     if (!enabled || !videoId) {
+      setBlobUrl(null);
+      setError(null);
+      setIsLoading(false);
       return;
     }
     let objectUrl: string | null = null;
     let cancelled = false;
 
     setIsLoading(true);
+    setBlobUrl(null);
     setError(null);
     fetchVideoBlobUrl(videoId)
       .then((url) => {
