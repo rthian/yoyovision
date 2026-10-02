@@ -207,6 +207,12 @@ async def get_entry(session: AsyncSession, entry_id: str) -> JudgingEntryORM:
     return entry
 
 
+async def delete_entry(session: AsyncSession, entry: JudgingEntryORM) -> None:
+    """Delete judging data while preserving the underlying videos and analyses."""
+    await session.delete(entry)
+    await session.commit()
+
+
 async def update_entry(
     session: AsyncSession,
     entry: JudgingEntryORM,
@@ -241,7 +247,10 @@ async def update_entry(
         raise JudgingServiceError("Locked entries cannot be edited.")
 
     if title is not None:
-        entry.title = title
+        clean_title = title.strip()
+        if not clean_title:
+            raise JudgingServiceError("Judging entry name is required.")
+        entry.title = clean_title
     if mode is not None:
         entry.mode = mode
     if status is not None:

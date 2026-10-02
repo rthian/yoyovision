@@ -658,6 +658,10 @@ export function updateJudgingEntry(
   });
 }
 
+export function deleteJudgingEntry(entryId: string): Promise<void> {
+  return request<void>(`/judging-entries/${entryId}`, { method: "DELETE" });
+}
+
 export function addJudgeToEntry(
   entryId: string,
   payload: { display_name: string }

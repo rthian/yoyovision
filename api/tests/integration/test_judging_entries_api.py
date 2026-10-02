@@ -10,9 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from yoyovision_ml.media_validation import VideoMetadata
 
 from yoyovision_api import security
-from yoyovision_api.auth import hash_password
-from yoyovision_api.db_models import JudgeAssignmentORM, User
-from yoyovision_api.judging_enums import UserRole
+from yoyovision_api.db_models import JudgeAssignmentORM
 from yoyovision_api.services.invite_token import hash_token, is_token_active
 
 _MP4_HEADER = b"\x00\x00\x00\x18ftypmp42" + b"\x00" * 8
@@ -27,9 +25,7 @@ def _mock_ffprobe(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(security, "probe_video_metadata", lambda path: fake_metadata)
 
 
-async def _upload_video(
-    client: AsyncClient, headers: dict[str, str], division: str = "1A"
-) -> str:
+async def _upload_video(client: AsyncClient, headers: dict[str, str], division: str = "1A") -> str:
     response = await client.post(
         "/videos",
         headers=headers,
@@ -115,6 +111,53 @@ async def test_entry_rejects_video_from_a_different_division(
     )
     assert response.status_code == 422
     assert "entry division is 3A" in response.json()["detail"]
+
+
+async def test_admin_can_rename_and_delete_entry_without_deleting_video(
+    client: AsyncClient,
+    admin_headers: dict[str, str],
+) -> None:
+    video_id = await _upload_video(client, admin_headers)
+    entry_id = (
+        await client.post(
+            "/judging-entries",
+            headers=admin_headers,
+            json={"title": "Original", "mode": "training", "video_ids": [video_id]},
+        )
+    ).json()["id"]
+
+    renamed = await client.patch(
+        f"/judging-entries/{entry_id}",
+        headers=admin_headers,
+        json={"title": "  Renamed panel  "},
+    )
+    assert renamed.status_code == 200, renamed.text
+    assert renamed.json()["title"] == "Renamed panel"
+
+    deleted = await client.delete(f"/judging-entries/{entry_id}", headers=admin_headers)
+    assert deleted.status_code == 204, deleted.text
+    assert (
+        await client.get(f"/judging-entries/{entry_id}", headers=admin_headers)
+    ).status_code == 404
+    assert (await client.get(f"/videos/{video_id}", headers=admin_headers)).status_code == 200
+
+
+async def test_non_admin_cannot_delete_judging_entry(
+    client: AsyncClient,
+    auth_headers: dict[str, str],
+    admin_headers: dict[str, str],
+) -> None:
+    video_id = await _upload_video(client, admin_headers)
+    entry_id = (
+        await client.post(
+            "/judging-entries",
+            headers=admin_headers,
+            json={"title": "Protected", "mode": "training", "video_ids": [video_id]},
+        )
+    ).json()["id"]
+
+    response = await client.delete(f"/judging-entries/{entry_id}", headers=auth_headers)
+    assert response.status_code == 403
 
 
 async def test_revoked_invite_token_is_inactive(
