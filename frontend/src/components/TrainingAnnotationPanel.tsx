@@ -11,18 +11,29 @@ import {
 } from "@/hooks/useTrainingAnnotations";
 import { useVideoBlobUrl } from "@/hooks/useVideoBlobUrl";
 import { ApiError, getTrainingRecord } from "@/lib/api-client";
-import type { Outcome, TechnicalCredit } from "@/lib/types";
+import { EVENT_FAMILIES, type Outcome, type TechnicalCredit } from "@/lib/types";
+import { titleCaseFromSnakeCase } from "@/lib/format";
 
 interface TrainingAnnotationPanelProps {
   videoId: string;
+  durationMs?: number;
 }
 
 function formatTimestamp(milliseconds: number): string {
   return `${(milliseconds / 1000).toFixed(2)}s`;
 }
 
+const EXTRA_TRICK_CATEGORIES = [
+  ["loop_combo", "Loop combo"],
+  ["wrap", "Wrap"],
+  ["tangler", "Tangler"],
+  ["offstring_catch", "Offstring catch"],
+  ["counterweight_release", "Counterweight release"],
+] as const;
+
 export function TrainingAnnotationPanel({
   videoId,
+  durationMs = 0,
 }: TrainingAnnotationPanelProps): JSX.Element {
   const videoBlob = useVideoBlobUrl(videoId, true);
   const annotations = useTrainingAnnotations(videoId, true);
@@ -31,6 +42,8 @@ export function TrainingAnnotationPanel({
   const deleteAnnotation = useDeleteTrainingAnnotation(videoId);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [currentMs, setCurrentMs] = useState(0);
+  const [seekToMs, setSeekToMs] = useState<number | null>(null);
+  const [seekRequestId, setSeekRequestId] = useState(0);
   const [label, setLabel] = useState("");
   const [elementType, setElementType] = useState("");
   const [startMs, setStartMs] = useState(0);
@@ -41,6 +54,21 @@ export function TrainingAnnotationPanel({
   const [notes, setNotes] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isExporting, setIsExporting] = useState(false);
+
+  function seekTo(milliseconds: number): void {
+    setSeekToMs(milliseconds);
+    setSeekRequestId((value) => value + 1);
+  }
+
+  function updateStart(milliseconds: number): void {
+    const nextStart = Math.max(0, Math.round(milliseconds));
+    setStartMs(nextStart);
+    if (endMs <= nextStart) setEndMs(Math.min(durationMs || nextStart + 1000, nextStart + 1000));
+  }
+
+  function updateEnd(milliseconds: number): void {
+    setEndMs(Math.max(0, Math.round(milliseconds)));
+  }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
@@ -65,7 +93,7 @@ export function TrainingAnnotationPanel({
       setElementType("");
       setNotes("");
       setStartMs(endMs);
-      setEndMs(endMs + 1000);
+      setEndMs(durationMs > 0 ? Math.min(durationMs, endMs + 1000) : endMs + 1000);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Could not save annotation.");
     }
@@ -95,8 +123,8 @@ export function TrainingAnnotationPanel({
       <div>
         <h2 className="text-lg font-semibold text-content-default">Training annotations</h2>
         <p className="text-sm text-content-dim">
-          Mark exact trick boundaries, give the trick a reusable name, and record what a
-          technical judge would click.
+          Play or scrub to the beginning of a trick and mark Start, then move to the end and
+          mark End. This labels a segment for training; it does not cut the original video.
         </p>
       </div>
 
@@ -107,12 +135,25 @@ export function TrainingAnnotationPanel({
           src={videoBlob.blobUrl}
           events={[]}
           onTimeUpdateMs={setCurrentMs}
+          seekToMs={seekToMs}
+          seekRequestId={seekRequestId}
         />
       ) : (
         <p className="text-sm text-status-alert">Could not load the video.</p>
       )}
 
-      <form onSubmit={handleSubmit} className="grid gap-3 sm:grid-cols-2">
+      <div className="rounded-s border border-status-informative/25 bg-status-informative/5 p-3">
+        <p className="text-sm font-semibold text-content-default">
+          Current playhead: {formatTimestamp(currentMs)}
+        </p>
+        <ol className="mt-1 list-decimal space-y-1 pl-5 text-sm text-content-dim">
+          <li>Pause at the first frame of the trick and choose <strong>Mark start</strong>.</li>
+          <li>Move to the final frame and choose <strong>Mark end</strong>.</li>
+          <li>Name the trick, choose its category and scoring result, then save.</li>
+        </ol>
+      </div>
+
+      <form onSubmit={handleSubmit} className="grid gap-4 sm:grid-cols-2">
         <label className="flex flex-col gap-1 text-sm">
           Trick name
           <input
@@ -124,35 +165,122 @@ export function TrainingAnnotationPanel({
           />
         </label>
         <label className="flex flex-col gap-1 text-sm">
-          Element type
-          <input
+          Trick category
+          <select
             required
             value={elementType}
             onChange={(event) => setElementType(event.target.value)}
-            placeholder="loop_combo"
             className="h-10 rounded-s border border-outline-default px-3"
-          />
+          >
+            <option value="">Choose a category</option>
+            {elementType &&
+            !EXTRA_TRICK_CATEGORIES.some(([value]) => value === elementType) &&
+            !EVENT_FAMILIES.some((value) => value === elementType) ? (
+              <option value={elementType}>{titleCaseFromSnakeCase(elementType)}</option>
+            ) : null}
+            {EXTRA_TRICK_CATEGORIES.map(([value, categoryLabel]) => (
+              <option key={value} value={value}>{categoryLabel}</option>
+            ))}
+            {EVENT_FAMILIES.map((family) => (
+              <option key={family} value={family}>{titleCaseFromSnakeCase(family)}</option>
+            ))}
+          </select>
+          <span className="text-xs text-content-dim">
+            The reusable family of movement. For example, “Black Hop” is the trick name and
+            “Hop” is its category.
+          </span>
         </label>
-        <div className="flex flex-col gap-1 text-sm">
-          Start: {formatTimestamp(startMs)}
+        <div className="flex flex-col gap-2 rounded-s border border-outline-soft bg-surface-alt p-3 text-sm">
+          <div className="flex items-center justify-between gap-3">
+            <span className="font-semibold">Start</span>
+            <input
+              aria-label="Trick start time in seconds"
+              type="number"
+              min={0}
+              max={durationMs > 0 ? durationMs / 1000 : undefined}
+              step="0.01"
+              value={(startMs / 1000).toFixed(2)}
+              onChange={(event) => updateStart(Number(event.target.value) * 1000)}
+              className="h-9 w-24 rounded-s border border-outline-default bg-surface-default px-2 text-right"
+            />
+          </div>
           <button
             type="button"
-            onClick={() => setStartMs(currentMs)}
-            className="h-10 rounded-s border border-outline-default px-3 text-left"
+            onClick={() => updateStart(currentMs)}
+            className="h-10 rounded-full bg-brand-primary px-3 font-semibold text-white"
           >
-            Set start to {formatTimestamp(currentMs)}
+            Mark start at {formatTimestamp(currentMs)}
           </button>
         </div>
-        <div className="flex flex-col gap-1 text-sm">
-          End: {formatTimestamp(endMs)}
+        <div className="flex flex-col gap-2 rounded-s border border-outline-soft bg-surface-alt p-3 text-sm">
+          <div className="flex items-center justify-between gap-3">
+            <span className="font-semibold">End</span>
+            <input
+              aria-label="Trick end time in seconds"
+              type="number"
+              min={0}
+              max={durationMs > 0 ? durationMs / 1000 : undefined}
+              step="0.01"
+              value={(endMs / 1000).toFixed(2)}
+              onChange={(event) => updateEnd(Number(event.target.value) * 1000)}
+              className="h-9 w-24 rounded-s border border-outline-default bg-surface-default px-2 text-right"
+            />
+          </div>
           <button
             type="button"
-            onClick={() => setEndMs(currentMs)}
-            className="h-10 rounded-s border border-outline-default px-3 text-left"
+            onClick={() => updateEnd(currentMs)}
+            className="h-10 rounded-full bg-brand-primary px-3 font-semibold text-white"
           >
-            Set end to {formatTimestamp(currentMs)}
+            Mark end at {formatTimestamp(currentMs)}
           </button>
         </div>
+        {durationMs > 0 ? (
+          <div className="sm:col-span-2">
+            <div className="relative h-3 overflow-hidden rounded-full bg-outline-softest" aria-label="Selected trick segment">
+              <div
+                className="absolute h-full rounded-full bg-status-informative"
+                style={{
+                  left: `${Math.min(100, (startMs / durationMs) * 100)}%`,
+                  width: `${Math.max(0, Math.min(100, ((endMs - startMs) / durationMs) * 100))}%`,
+                }}
+              />
+            </div>
+            <div className="mt-2 flex items-center justify-between text-xs text-content-dim">
+              <span>Selected: {formatTimestamp(startMs)}–{formatTimestamp(endMs)}</span>
+              <button type="button" onClick={() => seekTo(startMs)} className="font-semibold text-brand-boldest hover:underline">
+                Preview from start
+              </button>
+            </div>
+            <div className="mt-3 grid gap-2 rounded-s bg-surface-alt p-3 text-xs text-content-dim">
+              <label className="grid grid-cols-[80px_1fr_54px] items-center gap-2">
+                Adjust start
+                <input
+                  type="range"
+                  min={0}
+                  max={durationMs}
+                  step={10}
+                  value={Math.min(startMs, durationMs)}
+                  onChange={(event) => updateStart(Number(event.target.value))}
+                  className="accent-status-informative"
+                />
+                <span className="text-right">{formatTimestamp(startMs)}</span>
+              </label>
+              <label className="grid grid-cols-[80px_1fr_54px] items-center gap-2">
+                Adjust end
+                <input
+                  type="range"
+                  min={0}
+                  max={durationMs}
+                  step={10}
+                  value={Math.min(endMs, durationMs)}
+                  onChange={(event) => updateEnd(Number(event.target.value))}
+                  className="accent-status-informative"
+                />
+                <span className="text-right">{formatTimestamp(endMs)}</span>
+              </label>
+            </div>
+          </div>
+        ) : null}
         <label className="flex flex-col gap-1 text-sm">
           Outcome
           <select
@@ -166,7 +294,7 @@ export function TrainingAnnotationPanel({
           </select>
         </label>
         <label className="flex flex-col gap-1 text-sm">
-          Technical judge action
+          Scoring label
           <select
             value={technicalCredit}
             onChange={(event) =>
@@ -174,11 +302,12 @@ export function TrainingAnnotationPanel({
             }
             className="h-10 rounded-s border border-outline-default px-3"
           >
-            <option value="positive_click">Positive click</option>
-            <option value="negative_click">Negative click</option>
-            <option value="no_click">No click</option>
+            <option value="positive_click">Award technical point</option>
+            <option value="negative_click">Record a miss</option>
+            <option value="no_click">No technical point</option>
             <option value="uncertain">Needs review</option>
           </select>
+          <span className="text-xs text-content-dim">Choose how a technical judge should treat this segment.</span>
         </label>
         <label className="flex flex-col gap-1 text-sm sm:col-span-2">
           Notes
@@ -205,6 +334,11 @@ export function TrainingAnnotationPanel({
               ? "Save changes"
               : "Add annotation"}
         </button>
+        {endMs <= startMs ? (
+          <p role="alert" className="self-center text-sm text-status-alert">
+            End time must be after start time.
+          </p>
+        ) : null}
         {editingId ? (
           <button
             type="button"
@@ -222,13 +356,17 @@ export function TrainingAnnotationPanel({
         {(annotations.data ?? []).map((annotation) => (
           <div
             key={annotation.id}
-            className="flex items-center justify-between rounded-s border border-outline-soft p-3"
+            onClick={(event) => {
+              if (!(event.target as HTMLElement).closest("button")) seekTo(annotation.start_ms);
+            }}
+            title={`Go to ${formatTimestamp(annotation.start_ms)}`}
+            className="flex cursor-pointer items-center justify-between rounded-s border border-outline-soft p-3 hover:bg-surface-alt"
           >
             <div>
               <p className="font-semibold text-content-default">{annotation.label}</p>
               <p className="text-xs text-content-dim">
                 {formatTimestamp(annotation.start_ms)}–{formatTimestamp(annotation.end_ms)} ·{" "}
-                {annotation.element_type} · {annotation.outcome} ·{" "}
+                {titleCaseFromSnakeCase(annotation.element_type)} · {annotation.outcome} ·{" "}
                 {annotation.technical_credit.replaceAll("_", " ")}
               </p>
             </div>

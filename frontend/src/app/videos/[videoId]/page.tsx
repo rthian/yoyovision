@@ -70,7 +70,7 @@ function VideoDetail({ videoId }: { videoId: string }): JSX.Element {
         ) : null}
       </div>
 
-      <TrainingAnnotationPanel videoId={videoId} />
+      <TrainingAnnotationPanel videoId={videoId} durationMs={video.duration_ms ?? 0} />
 
       {video.division !== "1A" ? (
         <p className="rounded-s border border-outline-soft bg-surface-alt p-3 text-sm text-content-dim">
